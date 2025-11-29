@@ -1,0 +1,11 @@
+openapi: 3.0.0
+info:
+  title: Vega Delivery Partner / Rider API
+  version: 1.0.0
+  description: Rider Authentication + Registration + KYC + Kit Purchase API Documentation
+
+servers:
+  - url: http://localhost:5000
+    description: Local Backend Server
+
+
