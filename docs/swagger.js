@@ -9,17 +9,6 @@ const options = {
       version: "1.0.0",
       description: "Rider Authentication + Registration + KYC APIs",
     },
-
-    components: {
-      securitySchemes: {
-        BearerAuth: {
-          type: "http",
-          scheme: "bearer",
-          bearerFormat: "JWT",
-        },
-      },
-    },
-
     servers: [
       {
         url: `http://localhost:${process.env.PORT}`,
@@ -28,15 +17,15 @@ const options = {
     ],
   },
 
+  //Load swagger docs from route JS files
   apis: ["./routes/*.js"],
 };
 
-
 const swaggerSpec = swaggerJSDoc(options);
 
-const swaggerSetup = (app) => {
+function swaggerSetup(app) {
   app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-  console.log("Swagger Documentation Loaded → http://localhost:5000/api-docs");
-};
+  console.log("Swagger UI running → http://localhost:5000/api-docs");
+}
 
 module.exports = { swaggerSetup };

@@ -1,13 +1,8 @@
-const { string } = require("joi");
 const mongoose = require("mongoose");
 const { Schema } = mongoose;
 
 const RiderSchema = new Schema(
   {
-    /* =====================================================
-     PHONE & LOGIN
-    ===================================================== */
-
     phone: {
       countryCode: { type: String, default: "+91" },
       number: { type: String, required: true },
@@ -16,11 +11,12 @@ const RiderSchema = new Schema(
 
     lastOtpVerifiedAt: Date,
 
-    isFullyRegistered: { type: Boolean, default: false },
+    otp: {
+      code: { type: String },
+      expiresAt: { type: Date },
+    },
 
-    /* =====================================================
-     ONBOARDING STAGE MANAGER
-    ===================================================== */
+    isFullyRegistered: { type: Boolean, default: false },
 
     onboardingStage: {
       type: String,
@@ -53,59 +49,31 @@ const RiderSchema = new Schema(
       dlUploaded: { type: Boolean, default: false },
     },
 
-    /* =====================================================
-     PERSONAL INFO
-    ===================================================== */
-
     personalInfo: {
-      fullName: { type: String, required: true },
+      fullName: { type: String },      
       dob: { type: Date },
       gender: { type: String, enum: ["male", "female", "other"] },
-      primaryPhone: { type: String, required: true },
+      primaryPhone: { type: String },    
       secondaryPhone: { type: String },
-      email: { type: String }
+      email: { type: String },
     },
 
-    /* =====================================================
-     LOCATION INFO
-    ===================================================== */
-    // city: { type: String, required: true },
-    // area: { type: String, required: true },
     location: {
-      type:String  
-    //   city: { type: String, required: true },
-    //   area: { type: String, required: true },
-    //   landmark: { type: String }, // optional extra
-    //   pincode: { type: String },
-
-      // Optional: helps for zone assignment & GPS accuracy
-    //   coordinates: {
-    //     lat: { type: Number },
-    //     lng: { type: Number },
-    //   },
+        city: { type: String},
+        area: { type: String }
     },
 
-    /* =====================================================
-     VEHICLE INFORMATION
-    ===================================================== */
     vehicleInfo: {
-      type: { type: String, enum: ["ev", "bike", "scooty"], required: true }
+      type: { type: String, enum: ["ev", "bike", "scooty"] },  
     },
 
-    /* =====================================================
-     SELFIE
-    ===================================================== */
     selfie: {
       url: { type: String },
       uploadedAt: { type: Date },
     },
 
-    /* =====================================================
-     KYC DOCUMENTS (SAFE — NO aadhaar number stored)
-    ===================================================== */
     kyc: {
       aadhar: {
-        // Aadhaar NUMBER SHOULD NOT BE STORED
         isVerified: { type: Boolean, default: false },
         status: {
           type: String,
@@ -126,8 +94,8 @@ const RiderSchema = new Schema(
       },
 
       drivingLicense: {
-        frontImage: { type: String },
-        backImage: { type: String },
+        frontImage: String,
+        backImage: String,
         status: {
           type: String,
           enum: ["pending", "approved", "rejected"],
@@ -136,16 +104,8 @@ const RiderSchema = new Schema(
         rejectionReason: String,
       },
     },
-
-    status: {
-      type: String,
-      enum: ["pending", "actived", "rejected"],
-      default: "pending",
-    },
   },
-  {
-    timestamps: true, // adds createdAt & updatedAt
-  }
+  { timestamps: true }
 );
 
 module.exports = mongoose.model("Rider", RiderSchema);

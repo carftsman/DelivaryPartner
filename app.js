@@ -3,6 +3,8 @@ const { swaggerSetup } = require("./config/swagger");
 const helmet = require("helmet");
 const morgan = require("morgan");
 
+const riderRouter = require("./routes/riderRoute");
+const locationRouter = require("./routes/locationRoute");
 
 const app = express();
 
@@ -10,13 +12,15 @@ app.use(express.json());
 app.use(helmet());
 app.use(morgan("dev"));
 
-
-// Load Swagger
+// Swagger
 swaggerSetup(app);
 
 // Routes
+app.use("/api", riderRouter);
+app.use("/api/location", locationRouter);
+
 app.get("/", (req, res) => {
-  res.send("Vega Delivery Partner API Running need docs go to /api-docs");
+  res.send("Vega Delivery Partner API Running. Open /api-docs");
 });
 
 module.exports = app;
