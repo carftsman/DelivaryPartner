@@ -1,6 +1,6 @@
 const Rider = require("../models/RiderModel");
 const jwt = require("jsonwebtoken");
-
+const path = require("path");
 const { sendSMS } = require("../utils/twilio");
 const citiesData = require("../helpers/data.json");
 
@@ -186,9 +186,96 @@ exports.checkStatus = async (req, res) => {
 };
 
 // ------------------ PERSONAL INFO -------------------
-exports.updatePersonalInfo = async (req, res) => {
-  res.send("Update personal info logic");
+exports.savePersonalInfo = async (req, res) => {
+  try {
+    // riderId from your auth/middleware
+    // adjust depending on how you set it (req.rider, req.user, etc.)
+    const riderId = req.rider?._id
+
+    if (!riderId) {
+      return res.status(401).json({ message: "Unauthorized rider" });
+    }
+
+    const {
+      fullName,
+      dob,
+      gender,
+      primaryPhone,
+      secondaryPhone,
+      email,
+    } = req.body;
+
+    // ---------- Basic validation ----------
+    if (!fullName || !primaryPhone) {
+      return res.status(400).json({
+        message: "fullName and primaryPhone are required",
+      });
+    }
+
+    const allowedGenders = ["male", "female", "other"];
+    if (gender && !allowedGenders.includes(gender)) {
+      return res.status(400).json({
+        message: `gender must be one of: ${allowedGenders.join(", ")}`,
+      });
+    }
+
+    // ---------- Fetch rider ----------
+    const rider = await Rider.findById(riderId);
+    if (!rider) {
+      return res.status(404).json({ message: "Rider not found" });
+    }
+
+    // Optional guards to respect your flow
+    if (!rider.onboardingProgress.phoneVerified) {
+      return res
+        .status(400)
+        .json({ message: "Phone number is not verified yet" });
+    }
+
+    // if (!rider.onboardingProgress.appPermissionDone) {
+    //   return res
+    //     .status(400)
+    //     .json({ message: "App permissions are not completed yet" });
+    // }
+
+    // ---------- Update personalInfo ----------
+    rider.personalInfo = {
+      fullName,
+      dob,
+      gender,
+      primaryPhone,
+      secondaryPhone,
+      email,
+    };
+
+    // ---------- Update onboarding progress ----------
+    rider.onboardingProgress.personalInfoSubmitted = true;
+
+    // Move stage only if currently at PERSONAL_INFO
+    if (rider.onboardingStage === "PERSONAL_INFO") {
+      rider.onboardingStage = "SELFIE";
+    }
+
+    await rider.save();
+
+    return res.status(200).json({
+      message: "Personal info saved successfully",
+      data: {
+        riderId: rider._id,
+        personalInfo: rider.personalInfo,
+        onboardingProgress: rider.onboardingProgress,
+        onboardingStage: rider.onboardingStage,
+      },
+    });
+  } catch (err) {
+    console.error("Error saving personal info:", err);
+    return res.status(500).json({
+      message: "Error saving personal info",
+      error: err.message,
+    });
+  }
 };
+
 
 // ------------------ LOCATION -------------------
 // exports.updateLocation = async (req, res) => {
@@ -197,14 +284,112 @@ exports.updatePersonalInfo = async (req, res) => {
 
 // ------------------ VEHICLE -------------------
 exports.updateVehicle = async (req, res) => {
-  res.send("Update vehicle logic");
+  const ALLOWED_VEHICLE_TYPES = ["ev", "bike", "scooty"];
+
+  try {
+    const  riderId  = req.rider?._id;
+    const { type } = req.body;
+
+    // 1. Basic validation
+    if (!type) {
+      return res.status(400).json({ message: "Vehicle type is required" });
+    }
+
+    if (!ALLOWED_VEHICLE_TYPES.includes(type)) {
+      return res.status(400).json({ message: "Invalid vehicle type" });
+    }
+
+    // 2. Fetch rider
+    const rider = await Rider.findById(riderId);
+    if (!rider) {
+      return res.status(404).json({ message: "Rider not found" });
+    }
+
+    // Optional: enforce flow – phone & permissions & location done
+
+    // if (!rider.onboardingProgress.phoneVerified) {
+    //   return res
+    //     .status(400)
+    //     .json({ message: "Phone number is not verified yet" });
+    // }
+
+    // if (!rider.onboardingProgress.appPermissionDone) {
+    //   return res
+    //     .status(400)
+    //     .json({ message: "App permissions are not completed yet" });
+    // }
+
+    // if (!rider.onboardingProgress.citySelected) {
+    //   return res.status(400).json({
+    //     message: "Location is not selected yet",
+    //   });
+    // }
+
+    // 3. Update vehicle info
+    rider.vehicleInfo = { type };
+
+    // 4. Update onboarding progress
+    rider.onboardingProgress.vehicleSelected = true;
+
+    // 5. Move stage SELECT_VEHICLE -> PERSONAL_INFO
+    if (rider.onboardingStage === "SELECT_VEHICLE") {
+      rider.onboardingStage = "PERSONAL_INFO";
+    }
+
+    await rider.save();
+
+    return res.status(200).json({
+      message: "Vehicle selected successfully",
+      data: {
+        riderId,
+        vehicleInfo: rider.vehicleInfo,
+        onboardingProgress: rider.onboardingProgress,
+        onboardingStage: rider.onboardingStage,
+      },
+    });
+  } catch (err) {
+    console.error("Error selecting vehicle:", err);
+    return res.status(500).json({
+      message: "Error selecting vehicle",
+      error: err.message,
+    });
+  }
 };
+
 
 // ------------------ SELFIE -------------------
-exports.uploadSelfie = async (req, res) => {
-  res.send("Upload selfie logic");
-};
+exports.uploadSelfieController = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "Selfie file is required" });
+    }
 
+    // public path (served by express.static in server.js)
+    const selfieUrl = path.posix.join("/uploads/selfies", req.file.filename);
+
+    // OPTIONAL: Save selfie URL to rider doc if you have req.rider.id
+    // if (req.rider && req.rider.id) {
+    //   await Rider.findByIdAndUpdate(req.rider.id, {
+    //     selfie: { url: selfieUrl, uploadedAt: new Date() },
+    //     "onboardingProgress.selfieUploaded": true
+    //   });
+    // }
+
+    return res.status(200).json({
+      message: "Selfie uploaded successfully",
+      selfieUrl,
+      file: {
+        originalname: req.file.originalname,
+        filename: req.file.filename,
+        size: req.file.size,
+        mimetype: req.file.mimetype,
+      },
+    });
+  } catch (error) {
+    console.error("uploadSelfieController err:", error);
+    return res.status(500).json({ message: "Error uploading selfie", error: error.message });
+  }
+};
 // ------------------ KYC -------------------
 exports.uploadAadhar = async (req, res) => {
   res.send("Upload Aadhar logic");

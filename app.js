@@ -6,11 +6,15 @@ const morgan = require("morgan");
 const riderRouter = require("./routes/riderRoute");
 const locationRouter = require("./routes/locationRoute");
 
+
+
+
 const app = express();
 
 app.use(express.json());
 app.use(helmet());
 app.use(morgan("dev"));
+app.use("/uploads", express.static("uploads"));
 
 // Swagger
 swaggerSetup(app);
