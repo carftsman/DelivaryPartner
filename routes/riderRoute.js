@@ -5,16 +5,19 @@ const {
   sendOtp,
   verifyOtp,
   checkStatus,
-  updatePersonalInfo,
   updateLocation,
+  
   updateVehicle,
-  uploadSelfie,
+  savePersonalInfo,
+  uploadSelfieController,
+  
   uploadAadhar,
   uploadPan,
   uploadDL,
   getProfile,
 } = require("../controllers/riderRegisterController");
 const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
+const upload = require('../utils/multerSelfie')
 
 /* ============================================================
    AUTH & OTP
@@ -120,7 +123,7 @@ riderRouter.get("/auth/status", checkStatus);
  *       200:
  *         description: Personal info updated
  */
-riderRouter.post("/rider/personal-info", updatePersonalInfo);
+riderRouter.post("/rider/personal-info",riderAuthMiddleWare, savePersonalInfo);
 
 /* ===========================================================
    LOCATION
@@ -175,11 +178,12 @@ riderRouter.post("/rider/location",riderAuthMiddleWare,updateLocation);
  *       200:
  *         description: Vehicle updated
  */
-riderRouter.post("/rider/vehicle", updateVehicle);
+riderRouter.post("/vehicle",riderAuthMiddleWare, updateVehicle);
 
 /* ============================================================
    SELFIE
 ============================================================ */
+riderRouter.post("/selfie", riderAuthMiddleWare, upload.single("selfie_file") , uploadSelfieController);
 
 /**
  * @swagger
@@ -200,9 +204,7 @@ riderRouter.post("/rider/vehicle", updateVehicle);
  *     responses:
  *       200:
  *         description: Selfie uploaded
- */
-riderRouter.post("/rider/selfie", uploadSelfie);
-
+ *
 /* ============================================================
    KYC DOCUMENTS
 ============================================================ */
