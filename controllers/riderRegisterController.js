@@ -399,9 +399,54 @@ exports.uploadPan = async (req, res) => {
   res.send("Upload PAN logic");
 };
 
+
 exports.uploadDL = async (req, res) => {
-  res.send("Upload DL logic");
+  try {
+    const  riderId  = req.rider?._id;// take rider id from auth token
+
+    if (!req.files.front || !req.files.back) {
+      return res.status(400).json({
+        success: false,
+        message: "Front and back images are required",
+      });
+    }
+
+    const frontImage = req.files.front[0].path;
+    const backImage = req.files.back[0].path;
+
+    const rider = await Rider.findById(riderId);
+    if (!rider) {
+      return res.status(404).json({ success: false, message: "Rider not found" });
+    }
+
+    // Update DL fields
+    rider.kyc.drivingLicense.frontImage = frontImage;
+    rider.kyc.drivingLicense.backImage = backImage;
+    rider.kyc.drivingLicense.status = "approved";
+
+    // Update onboarding progress
+    rider.onboardingProgress.dlUploaded = true;
+
+    // Move onboarding stage
+    rider.onboardingStage = "KYC_SUBMITTED";
+
+    await rider.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Driving Licence uploaded successfully",
+      data: rider.kyc.drivingLicense,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
 };
+
+
 
 // ------------------ PROFILE -------------------
 exports.getProfile = async (req, res) => {
