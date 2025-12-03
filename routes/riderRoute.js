@@ -16,8 +16,8 @@ const {
 } = require("../controllers/riderRegisterController");
 
 const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
-const upload = require("../utils/multerSelfie");
-const uploadDriving=require('../utils/multerDL')
+const {upload} = require("../utils/azureUpload");
+// const uploadDriving=require('../utils/multerDL')
 
 // ============================================================
 //   AUTH & OTP
@@ -93,35 +93,80 @@ riderRouter.post("/auth/verify-otp", verifyOtp);
  */
 riderRouter.get("/auth/status", checkStatus);
 
-// ============================================================
-//   PERSONAL INFO
-// ============================================================
+
 
 /**
  * @swagger
  * /api/rider/personal-info:
  *   post:
- *     tags: [Rider Profile]
- *     summary: Save or update rider personal information
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               fullName:
- *                 type: string
- *               dob:
- *                 type: string
- *               gender:
- *                 type: string
- *               email:
- *                 type: string
+ *     tags: [Rider]
+ *     summary: Save rider personal information
+ *     description: "Save rider personal details. Requires Bearer auth. fullName and primaryPhone are required. gender must be one of: male, female, other."
+ *     security:
+ *       - bearerAuth: []
+ *     consumes:
+ *       - application/json
+ *     parameters:
+ *       - in: body
+ *         name: body
+ *         required: true
+ *         schema:
+ *           type: object
+ *           required:
+ *             - fullName
+ *             - primaryPhone
+ *           properties:
+ *             fullName:
+ *               type: string
+ *               example: "Ramu Kumar"
+ *             dob:
+ *               type: string
+ *               format: date
+ *               example: "1995-05-21"
+ *             gender:
+ *               type: string
+ *               enum: [male, female, other]
+ *               example: male
+ *             primaryPhone:
+ *               type: string
+ *               example: "9876543210"
+ *             secondaryPhone:
+ *               type: string
+ *               example: "9123456780"
+ *             email:
+ *               type: string
+ *               format: email
+ *               example: "ramu@example.com"
  *     responses:
  *       200:
- *         description: Personal info updated
+ *         description: Personal info saved successfully
+ *         schema:
+ *           type: object
+ *           properties:
+ *             message:
+ *               type: string
+ *               example: "Personal info saved successfully"
+ *             data:
+ *               type: object
+ *               properties:
+ *                 riderId:
+ *                   type: string
+ *                 personalInfo:
+ *                   type: object
+ *                 onboardingProgress:
+ *                   type: object
+ *                 onboardingStage:
+ *                   type: string
+ *       400:
+ *         description: Validation error (missing required fields / invalid gender / flow checks)
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Rider not found
+ *       500:
+ *         description: Server error
  */
+
 riderRouter.post("/rider/personal-info", riderAuthMiddleWare, savePersonalInfo);
 
 // ============================================================
@@ -160,23 +205,61 @@ riderRouter.post("/rider/location", riderAuthMiddleWare, updateLocation);
 /**
  * @swagger
  * /api/rider/vehicle:
- *   post:
- *     tags: [Rider Profile]
- *     summary: Save or update rider vehicle info
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               type:
- *                 type: string
- *                 enum: [bike, scooty, ev]
+ *   put:
+ *     tags: [Rider]
+ *     summary: Update rider vehicle type
+ *     description: "Save selected vehicle type. Allowed values: ev, bike, scooty. Requires Bearer auth."
+ *     security:
+ *       - bearerAuth: []
+ *     consumes:
+ *       - application/json
+ *     parameters:
+ *       - in: body
+ *         name: body
+ *         description: Vehicle type payload
+ *         required: true
+ *         schema:
+ *           type: object
+ *           required:
+ *             - type
+ *           properties:
+ *             type:
+ *               type: string
+ *               enum: [ev, bike, scooty]
+ *               example: bike
  *     responses:
  *       200:
- *         description: Vehicle updated
+ *         description: Vehicle selected successfully
+ *         schema:
+ *           type: object
+ *           properties:
+ *             message:
+ *               type: string
+ *               example: "Vehicle selected successfully"
+ *             data:
+ *               type: object
+ *               properties:
+ *                 riderId:
+ *                   type: string
+ *                 vehicleInfo:
+ *                   type: object
+ *                   properties:
+ *                     type:
+ *                       type: string
+ *                 onboardingProgress:
+ *                   type: object
+ *                 onboardingStage:
+ *                   type: string
+ *       400:
+ *         description: Bad request (missing or invalid vehicle type)
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Rider not found
+ *       500:
+ *         description: Server error
  */
+
 riderRouter.post("/rider/vehicle", riderAuthMiddleWare, updateVehicle);
 
 
@@ -201,23 +284,15 @@ riderRouter.post("/rider/vehicle", riderAuthMiddleWare, updateVehicle);
  *       200:
  *         description: Selfie uploaded
  */
-<<<<<<< routes/riderRoute.js
-riderRouter.post("/selfie", riderAuthMiddleWare, upload.single("selfie_file") , uploadSelfieController);
+riderRouter.post(
+  "/selfie",
+  riderAuthMiddleWare,
+  upload.single("selfie"),
+  uploadSelfieController
+);
 // ============================================================
    // KYC DOCUMENTS
 // ============================================================ 
-=======
-riderRouter.post(
-  "/rider/selfie",
-  riderAuthMiddleWare,
-  upload.single("selfie_file"),
-  uploadSelfieController
-);
-
-// ============================================================
-//   KYC DOCUMENTS
-// ============================================================
->>>>>>> routes/riderRoute.js
 
 /**
  * @swagger
@@ -264,7 +339,12 @@ riderRouter.post("/rider/kyc/aadhar", uploadAadhar);
  *       200:
  *         description: PAN uploaded
  */
-riderRouter.post("/rider/kyc/pan", uploadPan);
+riderRouter.post(
+  "/pan",
+  riderAuthMiddleWare,
+  upload.single("pan"),
+  uploadPan
+);
 
 /**
  * @swagger
@@ -331,14 +411,17 @@ riderRouter.post("/rider/kyc/pan", uploadPan);
  *         description: Server error
  */
 
+
 riderRouter.post(
-  "/upload-dl",
-  uploadDriving.fields([
+  "/dl",
+  riderAuthMiddleWare,
+  upload.fields([
     { name: "front", maxCount: 1 },
-    { name: "back", maxCount: 1 }
+    { name: "back", maxCount: 1 },
   ]),
   uploadDL
 );
+
 
 // ============================================================
 //   GET PROFILE

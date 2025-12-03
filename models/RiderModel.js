@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 const { Schema } = mongoose;
 
 const RiderSchema = new Schema(
-  {
+  { 
     phone: {
       countryCode: { type: String, default: "+91" },
       number: { type: String, required: true },
@@ -56,7 +56,7 @@ const RiderSchema = new Schema(
       primaryPhone: { type: String },    
       secondaryPhone: { type: String },
       email: { type: String },
-    },
+    }, 
 
     location: {
         city: { type: String},
