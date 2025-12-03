@@ -1,16 +1,8 @@
 const express = require("express");
-const router = express.Router();
+const aadharRoute = express.Router();
 const { sendOtp, verifyOtp } = require("../controllers/aadharController");
 const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
 
-
-
-/**
- * @swagger
- * tags:
- *   name: Aadhaar
- *   description: Aadhaar OTP Verification APIs
- */
 
 /**
  * @swagger
@@ -45,6 +37,8 @@ const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
  *       401:
  *         description: Unauthorized (missing or invalid token)
  */
+
+aadharRoute.post("/send-otp", riderAuthMiddleWare, sendOtp);
 
 /**
  * @swagger
@@ -84,12 +78,7 @@ const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
  *         description: Unauthorized or OTP expired
  */
 
+aadharRoute.post("/verify-otp", riderAuthMiddleWare, verifyOtp);
 
-
-
-
-router.post("/send-otp", riderAuthMiddleWare, sendOtp);
-router.post("/verify-otp", riderAuthMiddleWare, verifyOtp);
-
-module.exports = router;
+module.exports = aadharRoute;
 
