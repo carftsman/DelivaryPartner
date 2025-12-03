@@ -11,7 +11,7 @@ const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
  *     tags: [Aadhaar]
  *     summary: Send OTP to the rider's Aadhaar number
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -47,7 +47,7 @@ aadharRoute.post("/send-otp", riderAuthMiddleWare, sendOtp);
  *     tags: [Aadhaar]
  *     summary: Verify Aadhaar OTP and update rider KYC + onboarding stage
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
