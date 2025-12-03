@@ -183,7 +183,7 @@ riderRouter.post("/vehicle",riderAuthMiddleWare, updateVehicle);
 /* ============================================================
    SELFIE
 ============================================================ */
-riderRouter.post("/selfie", riderAuthMiddleWare, upload.single("selfie_file") , uploadSelfieController);
+
 
 /**
  * @swagger
@@ -204,10 +204,11 @@ riderRouter.post("/selfie", riderAuthMiddleWare, upload.single("selfie_file") , 
  *     responses:
  *       200:
  *         description: Selfie uploaded
- *
-/* ============================================================
-   KYC DOCUMENTS
-============================================================ */
+ */
+riderRouter.post("/selfie", riderAuthMiddleWare, upload.single("selfie_file") , uploadSelfieController);
+// ============================================================
+   // KYC DOCUMENTS
+// ============================================================ 
 
 /**
  * @swagger
