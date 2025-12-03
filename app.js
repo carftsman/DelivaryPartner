@@ -5,6 +5,7 @@ const morgan = require("morgan");
 
 const riderRouter = require("./routes/riderRoute");
 const locationRouter = require("./routes/locationRoute");
+const aadharRoutes = require("./routes/aadharRoutes");
 
 
 
@@ -22,6 +23,7 @@ swaggerSetup(app);
 // Routes
 app.use("/api", riderRouter);
 app.use("/api/location", locationRouter);
+app.use("/aadhar", aadharRoutes);
 
 app.get("/", (req, res) => {
   res.send("Vega Delivery Partner API Running. Open /api-docs");
