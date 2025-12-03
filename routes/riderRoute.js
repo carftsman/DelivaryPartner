@@ -180,7 +180,7 @@ riderRouter.post("/rider/personal-info", riderAuthMiddleWare, savePersonalInfo);
  *     tags: [Rider Profile]
  *     summary: Save rider location (city, area)
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -205,7 +205,7 @@ riderRouter.post("/rider/location", riderAuthMiddleWare, updateLocation);
 /**
  * @swagger
  * /api/rider/vehicle:
- *   put:
+ *   post:
  *     tags: [Rider]
  *     summary: Update rider vehicle type
  *     description: "Save selected vehicle type. Allowed values: ev, bike, scooty. Requires Bearer auth."
@@ -268,21 +268,50 @@ riderRouter.post("/rider/vehicle", riderAuthMiddleWare, updateVehicle);
  * @swagger
  * /api/rider/selfie:
  *   post:
- *     tags: [KYC]
+ *     tags: [Rider]
  *     summary: Upload rider selfie
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               selfie_file:
- *                 type: string
- *                 format: binary
+ *     description: Upload selfie file. Field name must be selfie. Returns public file URL and metadata. Requires Bearer auth.
+ *     security:
+ *       - bearerAuth: []
+ *     consumes:
+ *       - multipart/form-data
+ *     parameters:
+ *       - in: formData
+ *         name: selfie
+ *         type: file
+ *         required: true
+ *         description: Image file to upload (jpg/png). Field name selfie
  *     responses:
  *       200:
- *         description: Selfie uploaded
+ *         description: Selfie uploaded successfully
+ *         schema:
+ *           type: object
+ *           properties:
+ *             message:
+ *               type: string
+ *               example: "Selfie uploaded successfully"
+ *             selfieUrl:
+ *               type: string
+ *               example: "/uploads/selfies/1700000000000-myphoto.jpg"
+ *             file:
+ *               type: object
+ *               properties:
+ *                 originalname:
+ *                   type: string
+ *                 filename:
+ *                   type: string
+ *                 size:
+ *                   type: integer
+ *                 mimetype:
+ *                   type: string
+ *       400:
+ *         description: Bad request (file missing / multer validation error)
+ *       401:
+ *         description: Unauthorized
+ *       413:
+ *         description: Payload too large (file exceeded allowed size)
+ *       500:
+ *         description: Server error
  */
 riderRouter.post(
   "/selfie",
@@ -317,6 +346,7 @@ riderRouter.post(
  *       200:
  *         description: Aadhaar uploaded
  */
+
 riderRouter.post("/rider/kyc/aadhar", uploadAadhar);
 
 /**
@@ -325,6 +355,8 @@ riderRouter.post("/rider/kyc/aadhar", uploadAadhar);
  *   post:
  *     tags: [KYC]
  *     summary: Upload PAN card image
+ *     security:
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -410,7 +442,6 @@ riderRouter.post(
  *       500:
  *         description: Server error
  */
-
 
 riderRouter.post(
   "/dl",
