@@ -3,7 +3,93 @@ const router = express.Router();
 const { sendOtp, verifyOtp } = require("../controllers/aadharController");
 const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
 
+
+
+/**
+ * @swagger
+ * tags:
+ *   name: Aadhaar
+ *   description: Aadhaar OTP Verification APIs
+ */
+
+/**
+ * @swagger
+ * /aadhar/send-otp:
+ *   post:
+ *     tags: [Aadhaar]
+ *     summary: Send OTP to the rider's Aadhaar number
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - aadharNumber
+ *             properties:
+ *               aadharNumber:
+ *                 type: string
+ *                 example: "234567890123"
+ *     responses:
+ *       200:
+ *         description: OTP sent successfully
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "OTP sent successfully"
+ *               otp: "123456"
+ *       400:
+ *         description: Invalid Aadhaar number
+ *       401:
+ *         description: Unauthorized (missing or invalid token)
+ */
+
+/**
+ * @swagger
+ * /aadhar/verify-otp:
+ *   post:
+ *     tags: [Aadhaar]
+ *     summary: Verify Aadhaar OTP and update rider KYC + onboarding stage
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - aadharNumber
+ *               - otp
+ *             properties:
+ *               aadharNumber:
+ *                 type: string
+ *                 example: "234567890123"
+ *               otp:
+ *                 type: string
+ *                 example: "123456"
+ *     responses:
+ *       200:
+ *         description: OTP verified successfully
+ *         content:
+ *           application/json:
+ *             example:
+ *               verified: true
+ *               message: "OTP verified successfully"
+ *       400:
+ *         description: Invalid OTP or Aadhaar mismatch
+ *       401:
+ *         description: Unauthorized or OTP expired
+ */
+
+
+
+
+
 router.post("/send-otp", riderAuthMiddleWare, sendOtp);
 router.post("/verify-otp", riderAuthMiddleWare, verifyOtp);
 
 module.exports = router;
+

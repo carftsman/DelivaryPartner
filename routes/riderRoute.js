@@ -179,9 +179,7 @@ riderRouter.post("/rider/location", riderAuthMiddleWare, updateLocation);
  */
 riderRouter.post("/rider/vehicle", riderAuthMiddleWare, updateVehicle);
 
-// ============================================================
-//   SELFIE
-// ============================================================
+
 
 /**
  * @swagger
@@ -203,6 +201,12 @@ riderRouter.post("/rider/vehicle", riderAuthMiddleWare, updateVehicle);
  *       200:
  *         description: Selfie uploaded
  */
+<<<<<<< routes/riderRoute.js
+riderRouter.post("/selfie", riderAuthMiddleWare, upload.single("selfie_file") , uploadSelfieController);
+// ============================================================
+   // KYC DOCUMENTS
+// ============================================================ 
+=======
 riderRouter.post(
   "/rider/selfie",
   riderAuthMiddleWare,
@@ -213,6 +217,7 @@ riderRouter.post(
 // ============================================================
 //   KYC DOCUMENTS
 // ============================================================
+>>>>>>> routes/riderRoute.js
 
 /**
  * @swagger
