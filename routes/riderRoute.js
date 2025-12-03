@@ -6,22 +6,22 @@ const {
   verifyOtp,
   checkStatus,
   updateLocation,
-  
   updateVehicle,
   savePersonalInfo,
   uploadSelfieController,
-  
   uploadAadhar,
   uploadPan,
   uploadDL,
   getProfile,
 } = require("../controllers/riderRegisterController");
-const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
-const upload = require('../utils/multerSelfie')
 
-/* ============================================================
-   AUTH & OTP
-============================================================ */
+const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
+const upload = require("../utils/multerSelfie");
+const uploadDriving=require('../utils/multerDL')
+
+// ============================================================
+//   AUTH & OTP
+// ============================================================
 
 /**
  * @swagger
@@ -73,7 +73,6 @@ riderRouter.post("/auth/send-otp", sendOtp);
  */
 riderRouter.post("/auth/verify-otp", verifyOtp);
 
-
 /**
  * @swagger
  * /api/auth/status:
@@ -94,9 +93,9 @@ riderRouter.post("/auth/verify-otp", verifyOtp);
  */
 riderRouter.get("/auth/status", checkStatus);
 
-/* ============================================================
-   PERSONAL INFO
-============================================================ */
+// ============================================================
+//   PERSONAL INFO
+// ============================================================
 
 /**
  * @swagger
@@ -123,11 +122,11 @@ riderRouter.get("/auth/status", checkStatus);
  *       200:
  *         description: Personal info updated
  */
-riderRouter.post("/rider/personal-info",riderAuthMiddleWare, savePersonalInfo);
+riderRouter.post("/rider/personal-info", riderAuthMiddleWare, savePersonalInfo);
 
-/* ===========================================================
-   LOCATION
-============================================================ */
+// ============================================================
+//   LOCATION
+// ============================================================
 
 /**
  * @swagger
@@ -152,11 +151,11 @@ riderRouter.post("/rider/personal-info",riderAuthMiddleWare, savePersonalInfo);
  *       200:
  *         description: Location updated
  */
-riderRouter.post("/rider/location",riderAuthMiddleWare,updateLocation);
+riderRouter.post("/rider/location", riderAuthMiddleWare, updateLocation);
 
-/* ============================================================
-   VEHICLE
-============================================================ */
+// ============================================================
+//   VEHICLE
+// ============================================================
 
 /**
  * @swagger
@@ -178,12 +177,11 @@ riderRouter.post("/rider/location",riderAuthMiddleWare,updateLocation);
  *       200:
  *         description: Vehicle updated
  */
-riderRouter.post("/vehicle",riderAuthMiddleWare, updateVehicle);
+riderRouter.post("/rider/vehicle", riderAuthMiddleWare, updateVehicle);
 
-/* ============================================================
-   SELFIE
-============================================================ */
-riderRouter.post("/selfie", riderAuthMiddleWare, upload.single("selfie_file") , uploadSelfieController);
+// ============================================================
+//   SELFIE
+// ============================================================
 
 /**
  * @swagger
@@ -198,16 +196,23 @@ riderRouter.post("/selfie", riderAuthMiddleWare, upload.single("selfie_file") , 
  *           schema:
  *             type: object
  *             properties:
- *               file:
+ *               selfie_file:
  *                 type: string
  *                 format: binary
  *     responses:
  *       200:
  *         description: Selfie uploaded
- *
-/* ============================================================
-   KYC DOCUMENTS
-============================================================ */
+ */
+riderRouter.post(
+  "/rider/selfie",
+  riderAuthMiddleWare,
+  upload.single("selfie_file"),
+  uploadSelfieController
+);
+
+// ============================================================
+//   KYC DOCUMENTS
+// ============================================================
 
 /**
  * @swagger
@@ -258,32 +263,81 @@ riderRouter.post("/rider/kyc/pan", uploadPan);
 
 /**
  * @swagger
- * /api/rider/kyc/dl:
+ * /api/dl/upload:
  *   post:
- *     tags: [KYC]
- *     summary: Upload Driving License images
+ *     tags: [KYC - Driving License]
+ *     summary: Upload Driving License front & back images
+ *     description: This API uploads DL front & back images and updates onboarding progress + KYC status.
+ *     
+ *     security:
+ *       - bearerAuth: []   # JWT auth
+ *
  *     requestBody:
  *       required: true
  *       content:
  *         multipart/form-data:
  *           schema:
  *             type: object
+ *             required:
+ *               - front
+ *               - back
  *             properties:
- *               frontImage:
+ *               front:
  *                 type: string
  *                 format: binary
- *               backImage:
+ *                 description: Driving License front image
+ *               back:
  *                 type: string
  *                 format: binary
+ *                 description: Driving License back image
+ *
  *     responses:
  *       200:
- *         description: DL uploaded
+ *         description: Driving Licence uploaded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Driving Licence uploaded successfully
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     frontImage:
+ *                       type: string
+ *                       example: uploads/dl/front.jpg
+ *                     backImage:
+ *                       type: string
+ *                       example: uploads/dl/back.jpg
+ *                     status:
+ *                       type: string
+ *                       example: pending
+ *
+ *       400:
+ *         description: Validation error - Missing images
+ *       404:
+ *         description: Rider not found
+ *       500:
+ *         description: Server error
  */
-riderRouter.post("/rider/kyc/dl", uploadDL);
 
-/* ============================================================
-   GET PROFILE
-============================================================ */
+riderRouter.post(
+  "/upload-dl",
+  uploadDriving.fields([
+    { name: "front", maxCount: 1 },
+    { name: "back", maxCount: 1 }
+  ]),
+  uploadDL
+);
+
+// ============================================================
+//   GET PROFILE
+// ============================================================
 
 /**
  * @swagger
