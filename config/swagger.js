@@ -12,7 +12,7 @@ const options = {
 
     components: {
       securitySchemes: {
-        BearerAuth: {
+        bearerAuth: {
           type: "http",
           scheme: "bearer",
           bearerFormat: "JWT",
@@ -36,7 +36,7 @@ const swaggerSpec = swaggerJSDoc(options);
 
 const swaggerSetup = (app) => {
   app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-  console.log("Swagger Documentation Loaded → http://localhost:5000/api-docs");
+  console.log(`Swagger Documentation Loaded → http://localhost:${process.env.PORT}/api-docs`);
 };
 
 module.exports = { swaggerSetup };

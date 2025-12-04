@@ -3,6 +3,7 @@ const jwt = require("jsonwebtoken");
 const path = require("path");
 const { sendSMS } = require("../utils/twilio");
 const citiesData = require("../helpers/data.json");
+const { uploadToAzure } = require("../utils/azureUpload");
 
 
 // ============================================================
@@ -188,9 +189,7 @@ exports.checkStatus = async (req, res) => {
 // ------------------ PERSONAL INFO -------------------
 exports.savePersonalInfo = async (req, res) => {
   try {
-    // riderId from your auth/middleware
-    // adjust depending on how you set it (req.rider, req.user, etc.)
-    const riderId = req.rider?._id
+    const riderId = req.rider?._id; // middleware attaches rider
 
     if (!riderId) {
       return res.status(401).json({ message: "Unauthorized rider" });
@@ -205,17 +204,10 @@ exports.savePersonalInfo = async (req, res) => {
       email,
     } = req.body;
 
-    // ---------- Basic validation ----------
+    // ---------- Basic required fields ----------
     if (!fullName || !primaryPhone) {
       return res.status(400).json({
         message: "fullName and primaryPhone are required",
-      });
-    }
-
-    const allowedGenders = ["male", "female", "other"];
-    if (gender && !allowedGenders.includes(gender)) {
-      return res.status(400).json({
-        message: `gender must be one of: ${allowedGenders.join(", ")}`,
       });
     }
 
@@ -225,24 +217,18 @@ exports.savePersonalInfo = async (req, res) => {
       return res.status(404).json({ message: "Rider not found" });
     }
 
-    // Optional guards to respect your flow
+    // ---------- Respect registration flow ----------
     if (!rider.onboardingProgress.phoneVerified) {
-      return res
-        .status(400)
-        .json({ message: "Phone number is not verified yet" });
+      return res.status(400).json({
+        message: "Phone not verified. Complete OTP verification first.",
+      });
     }
 
-    // if (!rider.onboardingProgress.appPermissionDone) {
-    //   return res
-    //     .status(400)
-    //     .json({ message: "App permissions are not completed yet" });
-    // }
-
-    // ---------- Update personalInfo ----------
+    // ---------- Update personal info ----------
     rider.personalInfo = {
       fullName,
       dob,
-      gender,
+      gender,           // schema will auto-validate allowed values
       primaryPhone,
       secondaryPhone,
       email,
@@ -251,14 +237,13 @@ exports.savePersonalInfo = async (req, res) => {
     // ---------- Update onboarding progress ----------
     rider.onboardingProgress.personalInfoSubmitted = true;
 
-    // Move stage only if currently at PERSONAL_INFO
-    if (rider.onboardingStage === "PERSONAL_INFO") {
-      rider.onboardingStage = "SELFIE";
-    }
+    // Move to next onboarding stage
+    rider.onboardingStage = "SELFIE";
 
     await rider.save();
 
     return res.status(200).json({
+      success: true,
       message: "Personal info saved successfully",
       data: {
         riderId: rider._id,
@@ -270,6 +255,7 @@ exports.savePersonalInfo = async (req, res) => {
   } catch (err) {
     console.error("Error saving personal info:", err);
     return res.status(500).json({
+      success: false,
       message: "Error saving personal info",
       error: err.message,
     });
@@ -277,71 +263,60 @@ exports.savePersonalInfo = async (req, res) => {
 };
 
 
-// ------------------ LOCATION -------------------
-// exports.updateLocation = async (req, res) => {
-//   res.send("Update location logic");
-// };
-
 // ------------------ VEHICLE -------------------
 exports.updateVehicle = async (req, res) => {
-  const ALLOWED_VEHICLE_TYPES = ["ev", "bike", "scooty"];
-
   try {
-    const  riderId  = req.rider?._id;
+    const riderId = req.rider?._id;
     const { type } = req.body;
 
-    // 1. Basic validation
+    // Basic required validation
     if (!type) {
-      return res.status(400).json({ message: "Vehicle type is required" });
+      return res.status(400).json({
+        success: false,
+        message: "Vehicle type is required",
+      });
     }
 
-    if (!ALLOWED_VEHICLE_TYPES.includes(type)) {
-      return res.status(400).json({ message: "Invalid vehicle type" });
-    }
-
-    // 2. Fetch rider
+    // Fetch rider
     const rider = await Rider.findById(riderId);
     if (!rider) {
-      return res.status(404).json({ message: "Rider not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Rider not found",
+      });
     }
 
-    // Optional: enforce flow – phone & permissions & location done
+    // Enforce previous steps (optional but recommended)
+    if (!rider.onboardingProgress.phoneVerified) {
+      return res.status(400).json({
+        success: false,
+        message: "Phone not verified. Complete OTP verification first.",
+      });
+    }
 
-    // if (!rider.onboardingProgress.phoneVerified) {
-    //   return res
-    //     .status(400)
-    //     .json({ message: "Phone number is not verified yet" });
-    // }
+    if (!rider.onboardingProgress.citySelected) {
+      return res.status(400).json({
+        success: false,
+        message: "Location must be selected before choosing vehicle.",
+      });
+    }
 
-    // if (!rider.onboardingProgress.appPermissionDone) {
-    //   return res
-    //     .status(400)
-    //     .json({ message: "App permissions are not completed yet" });
-    // }
-
-    // if (!rider.onboardingProgress.citySelected) {
-    //   return res.status(400).json({
-    //     message: "Location is not selected yet",
-    //   });
-    // }
-
-    // 3. Update vehicle info
+    // Update vehicle info (schema will auto-validate enum)
     rider.vehicleInfo = { type };
 
-    // 4. Update onboarding progress
+    // Update progress
     rider.onboardingProgress.vehicleSelected = true;
 
-    // 5. Move stage SELECT_VEHICLE -> PERSONAL_INFO
-    if (rider.onboardingStage === "SELECT_VEHICLE") {
-      rider.onboardingStage = "PERSONAL_INFO";
-    }
+    // Move stage forward
+    rider.onboardingStage = "PERSONAL_INFO";
 
     await rider.save();
 
     return res.status(200).json({
+      success: true,
       message: "Vehicle selected successfully",
       data: {
-        riderId,
+        riderId: rider._id,
         vehicleInfo: rider.vehicleInfo,
         onboardingProgress: rider.onboardingProgress,
         onboardingStage: rider.onboardingStage,
@@ -349,7 +324,9 @@ exports.updateVehicle = async (req, res) => {
     });
   } catch (err) {
     console.error("Error selecting vehicle:", err);
+
     return res.status(500).json({
+      success: false,
       message: "Error selecting vehicle",
       error: err.message,
     });
@@ -361,90 +338,120 @@ exports.updateVehicle = async (req, res) => {
 exports.uploadSelfieController = async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ message: "Selfie file is required" });
+      return res.status(400).json({ message: "Selfie file required" });
     }
 
-    // public path (served by express.static in server.js)
-    const selfieUrl = path.posix.join("/uploads/selfies", req.file.filename);
+    const url = await uploadToAzure(req.file, "selfies");
 
-    // OPTIONAL: Save selfie URL to rider doc if you have req.rider.id
-    // if (req.rider && req.rider.id) {
-    //   await Rider.findByIdAndUpdate(req.rider.id, {
-    //     selfie: { url: selfieUrl, uploadedAt: new Date() },
-    //     "onboardingProgress.selfieUploaded": true
-    //   });
-    // }
-
-    return res.status(200).json({
-      message: "Selfie uploaded successfully",
-      selfieUrl,
-      file: {
-        originalname: req.file.originalname,
-        filename: req.file.filename,
-        size: req.file.size,
-        mimetype: req.file.mimetype,
-      },
+    await Rider.findByIdAndUpdate(req.rider._id, {
+      selfie: { url, uploadedAt: new Date() },
+      "onboardingProgress.selfieUploaded": true,
+      onboardingStage: "AADHAAR"
     });
-  } catch (error) {
-    console.error("uploadSelfieController err:", error);
-    return res.status(500).json({ message: "Error uploading selfie", error: error.message });
+
+    res.json({ success: true, selfieUrl: url });
+  } catch (err) {
+    console.error("Selfie Upload Error:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };
+
 // ------------------ KYC -------------------
 exports.uploadAadhar = async (req, res) => {
   res.send("Upload Aadhar logic");
 };
 
 exports.uploadPan = async (req, res) => {
-  res.send("Upload PAN logic");
+  try {
+    if (!req.file)
+      return res.status(400).json({ message: "PAN image required" });
+
+    const url = await uploadToAzure(req.file, "pan");
+
+    await Rider.findByIdAndUpdate(req.rider._id, {
+      "kyc.pan.image": url,
+      "kyc.pan.status": "pending",
+      "onboardingProgress.panUploaded": true,
+      onboardingStage: "DL_UPLOAD"
+    });
+
+    res.json({ success: true, message: "PAN uploaded", url });
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
 };
+
 
 
 exports.uploadDL = async (req, res) => {
   try {
-    const  riderId  = req.rider?._id;// take rider id from auth token
+    const { front, back } = req.files;
 
-    if (!req.files.front || !req.files.back) {
+    if (!front || !back)
+      return res.status(400).json({ message: "Front & back images required" });
+
+    const frontUrl = await uploadToAzure(front[0], "dl");
+    const backUrl = await uploadToAzure(back[0], "dl");
+
+    await Rider.findByIdAndUpdate(req.rider._id, {
+      "kyc.drivingLicense.frontImage": frontUrl,
+      "kyc.drivingLicense.backImage": backUrl,
+      "kyc.drivingLicense.status": "pending",
+      "onboardingProgress.dlUploaded": true,
+      onboardingStage: "KYC_SUBMITTED"
+    });
+
+    res.json({
+      success: true,
+      message: "DL uploaded",
+      frontUrl,
+      backUrl
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+
+// ============================
+// RC Upload
+// ============================
+exports.uploadRC = async (req, res) => {
+  try {
+    const { front, back } = req.files;
+
+    if (!front || !back) {
       return res.status(400).json({
         success: false,
-        message: "Front and back images are required",
+        message: "Front & back RC images required",
       });
     }
 
-    const frontImage = req.files.front[0].path;
-    const backImage = req.files.back[0].path;
+    // Upload to your cloud or Azure
+    const frontUrl = await uploadToAzure(front[0], "rc");
+    const backUrl = await uploadToAzure(back[0], "rc");
 
-    const rider = await Rider.findById(riderId);
-    if (!rider) {
-      return res.status(404).json({ success: false, message: "Rider not found" });
-    }
+    await Rider.findByIdAndUpdate(req.rider._id, {
+      "kyc.rc.frontImage": frontUrl,
+      "kyc.rc.backImage": backUrl,
+      "kyc.rc.status": "pending",
+      "onboardingProgress.rc": true,
+      onboardingStage: "COMPLETED",
+    });
 
-    // Update DL fields
-    rider.kyc.drivingLicense.frontImage = frontImage;
-    rider.kyc.drivingLicense.backImage = backImage;
-    rider.kyc.drivingLicense.status = "approved";
-
-    // Update onboarding progress
-    rider.onboardingProgress.dlUploaded = true;
-
-    // Move onboarding stage
-    rider.onboardingStage = "KYC_SUBMITTED";
-
-    await rider.save();
-
-    return res.status(200).json({
+    res.json({
       success: true,
-      message: "Driving Licence uploaded successfully",
-      data: rider.kyc.drivingLicense,
+      message: "RC uploaded successfully",
+      frontUrl,
+      backUrl,
     });
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
+    console.error("RC Upload Error:", err);
+    res.status(500).json({ success: false, message: "Server error uploading RC" });
   }
 };
+
 
 
 

@@ -47,6 +47,7 @@ const RiderSchema = new Schema(
       aadharVerified: { type: Boolean, default: false },
       panUploaded: { type: Boolean, default: false },
       dlUploaded: { type: Boolean, default: false },
+      rc: { type: Boolean, default: false },
     },
 
     personalInfo: {
@@ -102,6 +103,16 @@ const RiderSchema = new Schema(
           default: "pending",
         },
         rejectionReason: String,
+      },
+      rc: {
+        frontImage: { type: String },
+        backImage: { type: String },
+        status: {
+          type: String,
+          enum: ["pending", "approved", "rejected"],
+          default: "pending",
+        },
+        rejectionReason: { type: String },
       },
     },
   },

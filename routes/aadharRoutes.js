@@ -1,16 +1,8 @@
 const express = require("express");
-const router = express.Router();
+const aadharRoute = express.Router();
 const { sendOtp, verifyOtp } = require("../controllers/aadharController");
 const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
 
-
-
-/**
- * @swagger
- * tags:
- *   name: Aadhaar
- *   description: Aadhaar OTP Verification APIs
- */
 
 /**
  * @swagger
@@ -19,7 +11,7 @@ const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
  *     tags: [Aadhaar]
  *     summary: Send OTP to the rider's Aadhaar number
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -46,6 +38,8 @@ const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
  *         description: Unauthorized (missing or invalid token)
  */
 
+aadharRoute.post("/send-otp", riderAuthMiddleWare, sendOtp);
+
 /**
  * @swagger
  * /aadhar/verify-otp:
@@ -53,7 +47,7 @@ const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
  *     tags: [Aadhaar]
  *     summary: Verify Aadhaar OTP and update rider KYC + onboarding stage
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -84,12 +78,7 @@ const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
  *         description: Unauthorized or OTP expired
  */
 
+aadharRoute.post("/verify-otp", riderAuthMiddleWare, verifyOtp);
 
-
-
-
-router.post("/send-otp", riderAuthMiddleWare, sendOtp);
-router.post("/verify-otp", riderAuthMiddleWare, verifyOtp);
-
-module.exports = router;
+module.exports = aadharRoute;
 
