@@ -28,7 +28,7 @@
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "twilio": "^5.10.6",
-    "uuid": "^13.0.0",
+    "uuid": "^8.3.2",
     "xss-clean": "^0.1.4"
   },
   "devDependencies": {
