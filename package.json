@@ -1,6 +1,9 @@
 {
   "name": "vega_delivery_partner_backend",
   "version": "1.0.0",
+  "engines": {
+    "node": "20.x"
+  },
   "description": "",
   "main": "server.js",
   "scripts": {
