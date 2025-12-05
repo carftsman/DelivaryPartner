@@ -2,6 +2,7 @@ const express = require("express");
 const { swaggerSetup } = require("./config/swagger");
 const helmet = require("helmet");
 const morgan = require("morgan");
+const cors = require('cors')
 
 const riderRouter = require("./routes/riderRoute");
 const locationRouter = require("./routes/locationRoute");
@@ -11,6 +12,7 @@ const aadharRoute = require("./routes/aadharRoutes");
 
 const app = express();
 
+app.use(cors())
 app.use(express.json());
 app.use(helmet());
 app.use(morgan("dev"));
