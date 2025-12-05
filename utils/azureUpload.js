@@ -1,7 +1,7 @@
 const { BlobServiceClient } = require("@azure/storage-blob");
 const multer = require("multer");
 const path = require("path");
-const { v4: uuidv4 } = require("uuid");
+// const { v4: uuidv4 } = require("uuid");
 
 const AZURE_CONTAINER = process.env.AZURE_CONTAINER_NAME;
 const AZURE_CONNECTION = process.env.AZURE_STORAGE_CONNECTION_STRING;
@@ -18,7 +18,7 @@ async function uploadToAzure(file, folder) {
   const containerClient = blobServiceClient.getContainerClient(AZURE_CONTAINER);
 
   const ext = path.extname(file.originalname);
-  const uniqueName = `${folder}/${uuidv4()}${ext}`;
+  const uniqueName = `${folder}/${Date.now()}${ext}`;
 
   const blockBlobClient = containerClient.getBlockBlobClient(uniqueName);
 
