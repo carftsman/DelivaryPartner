@@ -390,10 +390,10 @@ riderRouter.post(
  *           schema:
  *             type: object
  *             required:
- *               - file
+ *               - pan
  *               - panNumber
  *             properties:
- *               file:
+ *               pan:
  *                 type: string
  *                 format: binary
  *                 description: PAN card image file
@@ -580,12 +580,15 @@ riderRouter.post(
  *   get:
  *     tags: [Rider Profile]
  *     summary: Get rider complete profile
+ *     security:
+ *       - bearerAuth: [] 
  *     responses:
  *       200:
  *         description: Profile fetched successfully
  *       404:
  *         description: Rider not found
  */
-riderRouter.get("/rider/profile", getProfile);
+riderRouter.get("/rider/profile", riderAuthMiddleWare, getProfile);
+
 
 module.exports = riderRouter;
