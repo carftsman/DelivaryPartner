@@ -8,9 +8,7 @@ const RiderSchema = new Schema(
       number: { type: String, required: true },
       isVerified: { type: Boolean, default: false },
     },
-
     lastOtpVerifiedAt: Date,
-
     otp: {
       code: { type: String },
       expiresAt: { type: Date },
@@ -49,7 +47,11 @@ const RiderSchema = new Schema(
       dlUploaded: { type: Boolean, default: false },
       rc: { type: Boolean, default: false },
     },
-
+    permissions: {
+      camera: { type: Boolean, default: false },
+      foregroundLocation: { type: Boolean, default: false },
+      backgroundLocation: { type: Boolean, default: false },
+    },
     personalInfo: {
       fullName: { type: String },      
       dob: { type: Date },
@@ -85,6 +87,7 @@ const RiderSchema = new Schema(
       },
 
       pan: {
+        number: { type: String, trim: true },  
         image: { type: String },
         status: {
           type: String,
@@ -95,6 +98,7 @@ const RiderSchema = new Schema(
       },
 
       drivingLicense: {
+        number: { type: String, trim: true },  
         frontImage: String,
         backImage: String,
         status: {

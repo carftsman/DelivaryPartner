@@ -9,12 +9,11 @@ const {
   updateVehicle,
   savePersonalInfo,
   uploadSelfieController,
-  uploadAadhar,
   uploadPan,
   uploadDL,
   getProfile,
+  savePermissions,
   uploadRC,
-  
 } = require("../controllers/riderRegisterController");
 
 const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
@@ -39,8 +38,6 @@ const {upload} = require("../utils/azureUpload");
  *             type: object
  *             properties:
  *               phone:
- *                 type: string
- *               countryCode:
  *                 type: string
  *     responses:
  *       200:
@@ -179,25 +176,66 @@ riderRouter.post("/rider/personal-info", riderAuthMiddleWare, savePersonalInfo);
  * @swagger
  * /api/rider/location:
  *   post:
- *     tags: [Rider Profile]
- *     summary: Save rider location (city, area)
+ *     tags: [Rider]
+ *     summary: Update rider location (city & area)
+ *     description: Saves selected city and area for the rider and moves onboarding to SELECT_VEHICLE stage.
  *     security:
  *       - bearerAuth: []
+ *
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - city
+ *               - area
  *             properties:
  *               city:
  *                 type: string
+ *                 example: "Hyderabad"
  *               area:
  *                 type: string
+ *                 example: "Madhapur"
+ *
  *     responses:
  *       200:
- *         description: Location updated
+ *         description: Location updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Location updated
+ *                 location:
+ *                   type: object
+ *                   properties:
+ *                     city:
+ *                       type: string
+ *                       example: Hyderabad
+ *                     area:
+ *                       type: string
+ *                       example: Madhapur
+ *                 nextStage:
+ *                   type: string
+ *                   example: SELECT_VEHICLE
+ *
+ *       400:
+ *         description: Missing city or area
+ *
+ *       404:
+ *         description: Invalid city or area
+ *
+ *       500:
+ *         description: Server error
  */
+
 riderRouter.post("/rider/location", riderAuthMiddleWare, updateLocation);
 
 // ============================================================
@@ -316,7 +354,7 @@ riderRouter.post("/rider/vehicle", riderAuthMiddleWare, updateVehicle);
  *         description: Server error
  */
 riderRouter.post(
-  "/selfie",
+  "/rider/selfie",
   riderAuthMiddleWare,
   upload.single("selfie"),
   uploadSelfieController
@@ -327,54 +365,62 @@ riderRouter.post(
 
 /**
  * @swagger
- * /api/rider/kyc/aadhar:
- *   post:
- *     tags: [KYC]
- *     summary: Upload Aadhaar front/back images
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               frontImage:
- *                 type: string
- *                 format: binary
- *               backImage:
- *                 type: string
- *                 format: binary
- *     responses:
- *       200:
- *         description: Aadhaar uploaded
- */
-
-riderRouter.post("/rider/kyc/aadhar", uploadAadhar);
-
-/**
- * @swagger
- * /api/rider/kyc/pan:
+ * /api/rider/pan:
  *   post:
  *     tags: [KYC]
  *     summary: Upload PAN card image
+ *     description: Upload a PAN card image for KYC. Requires JWT authentication.
  *     security:
  *       - bearerAuth: []
+ *
  *     requestBody:
  *       required: true
  *       content:
  *         multipart/form-data:
  *           schema:
  *             type: object
+ *             required:
+ *               - file
  *             properties:
  *               file:
  *                 type: string
  *                 format: binary
+ *                 description: PAN card image file
+ *
  *     responses:
  *       200:
- *         description: PAN uploaded
+ *         description: PAN uploaded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: PAN uploaded successfully
+ *                 imageUrl:
+ *                   type: string
+ *                   example: "https://your-azure-url.com/pan/12345.png"
+ *
+ *       400:
+ *         description: Missing file or invalid input
+ *
+ *       401:
+ *         description: Unauthorized (Missing or invalid token)
+ *
+ *       404:
+ *         description: Rider not found
+ *
+ *       500:
+ *         description: Server error while uploading PAN
  */
+
+
 riderRouter.post(
-  "/pan",
+  "/rider/pan",
   riderAuthMiddleWare,
   upload.single("pan"),
   uploadPan
@@ -382,9 +428,9 @@ riderRouter.post(
 
 /**
  * @swagger
- * /api/dl/upload:
+ * /api/rider/dl:
  *   post:
- *     tags: [KYC - Driving License]
+ *     tags: [KYC]
  *     summary: Upload Driving License front & back images
  *     description: This API uploads DL front & back images and updates onboarding progress + KYC status.
  *     
@@ -446,7 +492,7 @@ riderRouter.post(
  */
 
 riderRouter.post(
-  "/dl",
+  "/rider/dl",
   riderAuthMiddleWare,
   upload.fields([
     { name: "front", maxCount: 1 },
@@ -454,6 +500,48 @@ riderRouter.post(
   ]),
   uploadDL
 );
+/**
+ * @swagger
+ * /api/rider/permissions:
+ *   post:
+ *     tags: [Rider]
+ *     summary: Save app permissions (camera, foreground, background)
+ *     description: Moved to next stage after permissions are granted. Requires Bearer token.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               camera:
+ *                 type: boolean
+ *                 example: true
+ *               foregroundLocation:
+ *                 type: boolean
+ *                 example: true
+ *               backgroundLocation:
+ *                 type: boolean
+ *                 example: false
+ *     responses:
+ *       200:
+ *         description: Permissions saved successfully
+ *       400:
+ *         description: Invalid or missing boolean values
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
+
+riderRouter.post(
+  "/rider/permissions",
+  riderAuthMiddleWare,
+  savePermissions
+);
+
 
 
 // ============================================================

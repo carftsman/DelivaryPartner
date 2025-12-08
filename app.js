@@ -14,7 +14,7 @@ const app = express();
 app.use(express.json());
 app.use(helmet());
 app.use(morgan("dev"));
-app.use("/uploads", express.static("uploads"));
+// app.use("/uploads", express.static("uploads"));
 
 // Swagger
 swaggerSetup(app);
@@ -23,7 +23,6 @@ swaggerSetup(app);
 app.use("/api", riderRouter);
 app.use("/api/location", locationRouter);
 app.use("/aadhar", aadharRoute);
-// app.use("/pan", panRoute);
 
 
 app.get("/", (req, res) => {

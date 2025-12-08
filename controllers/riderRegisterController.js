@@ -357,57 +357,58 @@ exports.uploadSelfieController = async (req, res) => {
 };
 
 // ------------------ KYC -------------------
-exports.uploadAadhar = async (req, res) => {
-  res.send("Upload Aadhar logic");
-};
+
+// exports.uploadPan = async (req, res) => {
+//   try {
+//     if (!req.file)
+//       return res.status(400).json({ message: "PAN image required" });
+
+//     const url = await uploadToAzure(req.file, "pan");
+
+//     await Rider.findByIdAndUpdate(req.rider._id, {
+//       "kyc.pan.image": url,
+//       "kyc.pan.status": "pending",
+//       "onboardingProgress.panUploaded": true,
+//       onboardingStage: "DL_UPLOAD"
+//     });
+
+//     res.json({ success: true, message: "PAN uploaded", url });
+//   } catch (err) {
+//     res.status(500).json({ message: "Server error" });
+//   }
+// };
 
 exports.uploadPan = async (req, res) => {
   try {
-    if (!req.file)
+    const rider = req.rider;
+    const { panNumber } = req.body;
+
+    if (!panNumber) {
+      return res.status(400).json({ message: "PAN number required" });
+    }
+
+    if (!req.file) {
       return res.status(400).json({ message: "PAN image required" });
+    }
 
-    const url = await uploadToAzure(req.file, "pan");
+    const imageUrl = await uploadToAzure(req.file, "pan");
 
-    await Rider.findByIdAndUpdate(req.rider._id, {
-      "kyc.pan.image": url,
+    await Rider.findByIdAndUpdate(rider._id, {
+      "kyc.pan.number": panNumber.trim(),
+      "kyc.pan.image": imageUrl,
       "kyc.pan.status": "pending",
-      "onboardingProgress.panUploaded": true,
-      onboardingStage: "DL_UPLOAD"
-    });
-
-    res.json({ success: true, message: "PAN uploaded", url });
-  } catch (err) {
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-
-
-exports.uploadDL = async (req, res) => {
-  try {
-    const { front, back } = req.files;
-
-    if (!front || !back)
-      return res.status(400).json({ message: "Front & back images required" });
-
-    const frontUrl = await uploadToAzure(front[0], "dl");
-    const backUrl = await uploadToAzure(back[0], "dl");
-
-    await Rider.findByIdAndUpdate(req.rider._id, {
-      "kyc.drivingLicense.frontImage": frontUrl,
-      "kyc.drivingLicense.backImage": backUrl,
-      "kyc.drivingLicense.status": "pending",
-      "onboardingProgress.dlUploaded": true,
-      onboardingStage: "KYC_SUBMITTED"
+      onboardingStage: "DL_UPLOAD",
+      "onboardingProgress.panUploaded": true
     });
 
     res.json({
       success: true,
-      message: "DL uploaded",
-      frontUrl,
-      backUrl
+      message: "PAN submitted successfully",
+      panNumber,
+      imageUrl,
     });
   } catch (err) {
+    console.error("PAN Upload Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -453,6 +454,145 @@ exports.uploadRC = async (req, res) => {
 };
 
 
+
+
+// exports.uploadDL = async (req, res) => {
+//   try {
+//     const { front, back } = req.files;
+
+//     if (!front || !back)
+//       return res.status(400).json({ message: "Front & back images required" });
+
+//     const frontUrl = await uploadToAzure(front[0], "dl");
+//     const backUrl = await uploadToAzure(back[0], "dl");
+
+//     await Rider.findByIdAndUpdate(req.rider._id, {
+//       "kyc.drivingLicense.frontImage": frontUrl,
+//       "kyc.drivingLicense.backImage": backUrl,
+//       "kyc.drivingLicense.status": "pending",
+//       "onboardingProgress.dlUploaded": true,
+//       onboardingStage: "KYC_SUBMITTED"
+//     });
+
+//     res.json({
+//       success: true,
+//       message: "DL uploaded",
+//       frontUrl,
+//       backUrl
+//     });
+//   } catch (err) {
+//     res.status(500).json({ message: "Server error" });
+//   }
+// };
+
+exports.uploadDL = async (req, res) => {
+  try {
+    const riderId = req.rider._id;
+    const { dlNumber } = req.body;
+
+    if (!dlNumber) {
+      return res.status(400).json({ message: "DL number required" });
+    }
+
+    if (!req.files.front || !req.files.back) {
+      return res.status(400).json({
+        message: "Front and back images are required",
+      });
+    }
+
+    const frontUrl = await uploadToAzure(req.files.front[0], "dl-front");
+    const backUrl = await uploadToAzure(req.files.back[0], "dl-back");
+
+    await Rider.findByIdAndUpdate(riderId, {
+      "kyc.drivingLicense.number": dlNumber.trim(),
+      "kyc.drivingLicense.frontImage": frontUrl,
+      "kyc.drivingLicense.backImage": backUrl,
+      "kyc.drivingLicense.status": "pending",
+      onboardingStage: "KYC_SUBMITTED",
+      "onboardingProgress.dlUploaded": true,
+    });
+
+    res.json({
+      success: true,
+      message: "Driving License submitted successfully",
+      data: {
+        dlNumber,
+        frontUrl,
+        backUrl,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.savePermissions = async (req, res) => {
+  console.log("hited")
+  try {
+    const riderId = req.rider?._id;
+    console.log(riderId)
+    if (!riderId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const { camera, foregroundLocation, backgroundLocation } = req.body;
+
+    // Validate input
+    const isBoolean = (v) => typeof v === "boolean";
+    if (!isBoolean(camera) || !isBoolean(foregroundLocation) || !isBoolean(backgroundLocation)) {
+      return res.status(400).json({
+        message: "camera, foregroundLocation, backgroundLocation must be boolean values",
+      });
+    }
+
+    const rider = await Rider.findById(riderId);
+    if (!rider) return res.status(404).json({ message: "Rider not found" });
+
+    // Rider must verify phone first
+    if (!rider.onboardingProgress.phoneVerified) {
+      return res.status(400).json({
+        message: "Phone verification required before permissions",
+      });
+    }
+
+    // Save permissions
+    rider.permissions = {
+      camera,
+      foregroundLocation,
+      backgroundLocation,
+    };
+
+    // Calculate combined permission status
+    const allGranted =
+      camera === true &&
+      foregroundLocation === true &&
+      backgroundLocation === true;
+
+    rider.onboardingProgress.appPermissionDone = allGranted;
+
+    // Stage update only if ALL permissions granted
+    if (allGranted && rider.onboardingStage === "APP_PERMISSIONS") {
+      rider.onboardingStage = "SELECT_LOCATION";
+    }
+
+    await rider.save();
+
+    return res.json({
+      success: true,
+      message: "Permissions saved successfully",
+      allPermissionsGranted: allGranted,
+      data: {
+        permissions: rider.permissions,
+        onboardingProgress: rider.onboardingProgress,
+        onboardingStage: rider.onboardingStage,
+      },
+    });
+  } catch (error) {
+    console.error("Permission API Error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
 
 
 // ------------------ PROFILE -------------------
