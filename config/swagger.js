@@ -27,7 +27,7 @@ const options = {
 
     servers: [
       {
-        url: "https://delivarypartner.onrender.com/",
+        url:process.env.NODE_ENV == "production"? "https://delivarypartner.onrender.com" :`http://localhost:${process.env.PORT}`,
         description: "Server",
       },
     ],
