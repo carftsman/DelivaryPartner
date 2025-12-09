@@ -488,7 +488,6 @@ exports.uploadDL = async (req, res) => {
 };
 
 exports.savePermissions = async (req, res) => {
-  console.log("hited")
   try {
     const riderId = req.rider?._id;
     console.log(riderId)
@@ -584,4 +583,76 @@ exports.getProfile = async (req, res) => {
     });
   }
 };
+
+
+exports.logoutOrDelete = async (req, res) => {
+  try {
+    await Rider.findByIdAndUpdate(req.rider._id, {
+      deviceToken: null,
+    });
+
+    return res.json({
+      success: true,
+      message: "Device token removed successfully",
+    });
+  } catch (err) {
+    return res.status(500).json({ message: "Server error" });
+  }
+}
+
+
+exports.onboardingStatus = async (req, res) => {
+  try {
+    // Validate rider from auth middleware
+    if (!req.rider || !req.rider._id) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized: Rider token invalid",
+      });
+    }
+
+    // Fetch onboarding fields ONLY
+    const rider = await Rider.findById(req.rider._id)
+      .select("onboardingStage onboardingProgress");
+
+    if (!rider) {
+      return res.status(404).json({
+        success: false,
+        message: "Rider not found",
+      });
+    }
+
+    // Extract values safely
+    const onboardingStage = rider.onboardingStage || "PHONE_VERIFICATION";
+
+    const onboardingProgress = rider.onboardingProgress || {
+      phoneVerified: false,
+      appPermissionDone: false,
+      citySelected: false,
+      vehicleSelected: false,
+      personalInfoSubmitted: false,
+      selfieUploaded: false,
+      aadharVerified: false,
+      panUploaded: false,
+      dlUploaded: false,
+    };
+
+    return res.status(200).json({
+      success: true,
+      message: "Onboarding status fetched successfully",
+      onboardingStage,
+      onboardingProgress,
+    });
+
+  } catch (error) {
+    console.error("OnboardingStatus Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error while fetching onboarding status",
+    });
+  }
+};
+
+
 

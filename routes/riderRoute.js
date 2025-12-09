@@ -13,6 +13,8 @@ const {
   uploadDL,
   getProfile,
   savePermissions,
+  logoutOrDelete,
+  onboardingStatus,
 } = require("../controllers/riderRegisterController");
 
 const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
@@ -92,71 +94,76 @@ riderRouter.post("/auth/verify-otp", verifyOtp);
 riderRouter.get("/auth/status", checkStatus);
 
 
-
 /**
  * @swagger
  * /api/rider/personal-info:
  *   post:
  *     tags: [Rider]
  *     summary: Save rider personal information
- *     description: "Save rider personal details. Requires Bearer auth. fullName and primaryPhone are required. gender must be one of: male, female, other."
+ *     description: Save personal information of the rider. fullName and primaryPhone are required.
  *     security:
  *       - bearerAuth: []
- *     consumes:
- *       - application/json
- *     parameters:
- *       - in: body
- *         name: body
- *         required: true
- *         schema:
- *           type: object
- *           required:
- *             - fullName
- *             - primaryPhone
- *           properties:
- *             fullName:
- *               type: string
- *               example: "Ramu Kumar"
- *             dob:
- *               type: string
- *               format: date
- *               example: "1995-05-21"
- *             gender:
- *               type: string
- *               enum: [male, female, other]
- *               example: male
- *             primaryPhone:
- *               type: string
- *               example: "9876543210"
- *             secondaryPhone:
- *               type: string
- *               example: "9123456780"
- *             email:
- *               type: string
- *               format: email
- *               example: "ramu@example.com"
+ *
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - fullName
+ *               - primaryPhone
+ *             properties:
+ *               fullName:
+ *                 type: string
+ *                 example: "Ramu Kumar"
+ *               dob:
+ *                 type: string
+ *                 format: date
+ *                 example: "1995-05-21"
+ *               gender:
+ *                 type: string
+ *                 enum: [male, female, other]
+ *                 example: male
+ *               primaryPhone:
+ *                 type: string
+ *                 example: "9876543210"
+ *               secondaryPhone:
+ *                 type: string
+ *                 example: "9123456780"
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "ramu@example.com"
+ *
  *     responses:
  *       200:
  *         description: Personal info saved successfully
- *         schema:
- *           type: object
- *           properties:
- *             message:
- *               type: string
- *               example: "Personal info saved successfully"
- *             data:
+ *         content:
+ *           application/json:
+ *             schema:
  *               type: object
  *               properties:
- *                 riderId:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
  *                   type: string
- *                 personalInfo:
+ *                   example: "Personal info saved successfully"
+ *                 data:
  *                   type: object
- *                 onboardingProgress:
- *                   type: object
- *                 onboardingStage:
- *                   type: string
+ *                   properties:
+ *                     riderId:
+ *                       type: string
+ *                     personalInfo:
+ *                       type: object
+ *                     onboardingProgress:
+ *                       type: object
+ *                     onboardingStage:
+ *                       type: string
+ *
  *       400:
- *         description: Validation error (missing required fields / invalid gender / flow checks)
+ *         description: Validation error
  *       401:
  *         description: Unauthorized
  *       404:
@@ -247,54 +254,64 @@ riderRouter.post("/rider/location", riderAuthMiddleWare, updateLocation);
  *   post:
  *     tags: [Rider]
  *     summary: Update rider vehicle type
- *     description: "Save selected vehicle type. Allowed values: ev, bike, scooty. Requires Bearer auth."
+ *     description: Save selected vehicle type. Allowed values ev, bike, scooty.
  *     security:
  *       - bearerAuth: []
- *     consumes:
- *       - application/json
- *     parameters:
- *       - in: body
- *         name: body
- *         description: Vehicle type payload
- *         required: true
- *         schema:
- *           type: object
- *           required:
- *             - type
- *           properties:
- *             type:
- *               type: string
- *               enum: [ev, bike, scooty]
- *               example: bike
+ *
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - type
+ *             properties:
+ *               type:
+ *                 type: string
+ *                 enum: [ev, bike, scooty]
+ *                 example: bike
+ *
  *     responses:
  *       200:
  *         description: Vehicle selected successfully
- *         schema:
- *           type: object
- *           properties:
- *             message:
- *               type: string
- *               example: "Vehicle selected successfully"
- *             data:
+ *         content:
+ *           application/json:
+ *             schema:
  *               type: object
  *               properties:
- *                 riderId:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
  *                   type: string
- *                 vehicleInfo:
+ *                   example: Vehicle selected successfully
+ *                 data:
  *                   type: object
  *                   properties:
- *                     type:
+ *                     riderId:
  *                       type: string
- *                 onboardingProgress:
- *                   type: object
- *                 onboardingStage:
- *                   type: string
+ *                     vehicleInfo:
+ *                       type: object
+ *                       properties:
+ *                         type:
+ *                           type: string
+ *                           example: bike
+ *                     onboardingProgress:
+ *                       type: object
+ *                     onboardingStage:
+ *                       type: string
+ *                       example: PERSONAL_INFO
+ *
  *       400:
- *         description: Bad request (missing or invalid vehicle type)
+ *         description: Invalid vehicle type or missing field
+ *
  *       401:
  *         description: Unauthorized
+ *
  *       404:
  *         description: Rider not found
+ *
  *       500:
  *         description: Server error
  */
@@ -589,6 +606,93 @@ riderRouter.post(
  *         description: Rider not found
  */
 riderRouter.get("/rider/profile", riderAuthMiddleWare, getProfile);
+
+/**
+ * @swagger
+ * /api/rider/device/token:
+ *   delete:
+ *     tags: [Rider]
+ *     summary: Delete device token when rider uninstalls the app or logout
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Token removed successfully
+ *       401:
+ *         description: Unauthorized
+ */
+riderRouter.delete("/rider/device/token", riderAuthMiddleWare,logoutOrDelete)
+
+/**
+ * @swagger
+ * /api/rider/onboarding-status:
+ *   get:
+ *     tags: [Onboarding]
+ *     summary: Get rider onboarding stage and progress
+ *     description: Returns the current onboarding stage and all progress flags for the rider. Requires JWT authentication.
+ *     security:
+ *       - bearerAuth: []
+ *
+ *     responses:
+ *       200:
+ *         description: Onboarding status fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Onboarding status fetched successfully
+ *                 onboardingStage:
+ *                   type: string
+ *                   example: "PAN_UPLOAD"
+ *                   description: Current onboarding stage of the rider
+ *                 onboardingProgress:
+ *                   type: object
+ *                   properties:
+ *                     phoneVerified:
+ *                       type: boolean
+ *                       example: true
+ *                     appPermissionDone:
+ *                       type: boolean
+ *                       example: true
+ *                     citySelected:
+ *                       type: boolean
+ *                       example: true
+ *                     vehicleSelected:
+ *                       type: boolean
+ *                       example: false
+ *                     personalInfoSubmitted:
+ *                       type: boolean
+ *                       example: false
+ *                     selfieUploaded:
+ *                       type: boolean
+ *                       example: false
+ *                     aadharVerified:
+ *                       type: boolean
+ *                       example: false
+ *                     panUploaded:
+ *                       type: boolean
+ *                       example: true
+ *                     dlUploaded:
+ *                       type: boolean
+ *                       example: false
+ *
+ *       401:
+ *         description: Unauthorized - Missing or invalid token
+ *
+ *       404:
+ *         description: Rider not found
+ *
+ *       500:
+ *         description: Server error while fetching onboarding status
+ */
+
+riderRouter.get("/rider/onboarding-status", riderAuthMiddleWare,onboardingStatus)
 
 
 module.exports = riderRouter;
