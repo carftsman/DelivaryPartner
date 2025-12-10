@@ -15,6 +15,9 @@ const RiderSchema = new Schema(
     },
 
     isFullyRegistered: { type: Boolean, default: false },
+    
+    refreshToken: { type: String },
+    deviceToken: { type: String, default: null },
 
     onboardingStage: {
       type: String,
