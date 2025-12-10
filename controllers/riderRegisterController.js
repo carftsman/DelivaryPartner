@@ -4,6 +4,8 @@ const path = require("path");
 const { sendSMS } = require("../utils/twilio");
 const citiesData = require("../helpers/data.json");
 const { uploadToAzure } = require("../utils/azureUpload");
+const { generateTokens } = require("../utils/token");
+
 
 
 // ============================================================
@@ -64,6 +66,79 @@ exports.sendOtp = async (req, res) => {
 // ============================================================
 // VERIFY OTP
 // ============================================================
+// exports.verifyOtp = async (req, res) => {
+//   try {
+//     let { phone, otp } = req.body;
+
+//     if (!phone || !otp)
+//       return res.status(400).json({ success: false, message: "Phone & OTP required" });
+
+//     // Normalize phone format
+//     let formattedPhone = phone;
+//     if (!phone.startsWith("+") && phone.length === 10) {
+//       formattedPhone = `+91${phone}`;
+//     }
+
+//     // Find rider
+//     const rider = await Rider.findOne({
+//       "phone.number": formattedPhone.replace("+91", ""),
+//     });
+
+//     if (!rider)
+//       return res.status(404).json({ success: false, message: "Rider not found" });
+
+//     // Check if OTP exists
+//     if (!rider.otp || !rider.otp.code)
+//       return res.status(400).json({ success: false, message: "OTP not generated" });
+
+//     // Check expiry
+//     if (new Date() > rider.otp.expiresAt)
+//       return res.status(401).json({ success: false, message: "OTP expired" });
+
+//     // Check OTP match
+//     if (otp !== rider.otp.code)
+//       return res.status(401).json({ success: false, message: "Incorrect OTP" });
+
+//     // Update phone status
+//     rider.phone.isVerified = true;
+//     rider.lastOtpVerifiedAt = new Date();
+
+//     // Update onboarding
+//     rider.onboardingProgress.phoneVerified = true;
+
+//     if (rider.onboardingStage === "PHONE_VERIFICATION") {
+//       rider.onboardingStage = "APP_PERMISSIONS"; // next onboarding step
+//     }
+
+//     // Remove OTP from DB
+//     rider.otp = undefined;
+
+//     await rider.save();
+
+//     // Generate JWT
+//     const token = jwt.sign(
+//       {
+//         riderId: rider._id,
+//         phone: rider.phone.number,
+//       },
+//       process.env.JWT_SECRET,
+//       { expiresIn: "7d" }
+//     );
+
+//     res.json({
+//       success: true,
+//       message: "OTP Verified",
+//       isNewUser: rider.isFullyRegistered === false,
+//       nextStage: rider.onboardingStage,
+//       token,
+//     });
+//   } catch (error) {
+//     console.error("Verify OTP ERROR →", error);
+//     res.status(500).json({ success: false, message: "Server error verifying OTP" });
+//   }
+// };
+
+
 exports.verifyOtp = async (req, res) => {
   try {
     let { phone, otp } = req.body;
@@ -71,70 +146,60 @@ exports.verifyOtp = async (req, res) => {
     if (!phone || !otp)
       return res.status(400).json({ success: false, message: "Phone & OTP required" });
 
-    // Normalize phone format
-    let formattedPhone = phone;
-    if (!phone.startsWith("+") && phone.length === 10) {
-      formattedPhone = `+91${phone}`;
-    }
+    // Normalize
+    let formattedPhone = phone.startsWith("+91") ? phone : `+91${phone}`;
+    formattedPhone = formattedPhone.replace("+91", "");
 
-    // Find rider
-    const rider = await Rider.findOne({
-      "phone.number": formattedPhone.replace("+91", ""),
-    });
+    const rider = await Rider.findOne({ "phone.number": formattedPhone });
 
     if (!rider)
       return res.status(404).json({ success: false, message: "Rider not found" });
 
-    // Check if OTP exists
-    if (!rider.otp || !rider.otp.code)
+    // Validate OTP
+    if (!rider.otp?.code)
       return res.status(400).json({ success: false, message: "OTP not generated" });
 
-    // Check expiry
     if (new Date() > rider.otp.expiresAt)
       return res.status(401).json({ success: false, message: "OTP expired" });
 
-    // Check OTP match
     if (otp !== rider.otp.code)
       return res.status(401).json({ success: false, message: "Incorrect OTP" });
 
-    // Update phone status
+    // Update verification & onboarding
     rider.phone.isVerified = true;
     rider.lastOtpVerifiedAt = new Date();
-
-    // Update onboarding
     rider.onboardingProgress.phoneVerified = true;
 
     if (rider.onboardingStage === "PHONE_VERIFICATION") {
-      rider.onboardingStage = "APP_PERMISSIONS"; // next onboarding step
+      rider.onboardingStage = "APP_PERMISSIONS";
     }
 
-    // Remove OTP from DB
+    // Generate Access + Refresh tokens
+    const { accessToken, refreshToken } = generateTokens(rider);
+
+    // Save refresh token to DB
+    rider.refreshToken = refreshToken;
+
+    // Clear OTP
     rider.otp = undefined;
 
     await rider.save();
 
-    // Generate JWT
-    const token = jwt.sign(
-      {
-        riderId: rider._id,
-        phone: rider.phone.number,
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
-
-    res.json({
+    return res.json({
       success: true,
       message: "OTP Verified",
       isNewUser: rider.isFullyRegistered === false,
       nextStage: rider.onboardingStage,
-      token,
+      accessToken,
+      refreshToken,
     });
+
   } catch (error) {
     console.error("Verify OTP ERROR →", error);
-    res.status(500).json({ success: false, message: "Server error verifying OTP" });
+    return res.status(500).json({ success: false, message: "Server error verifying OTP" });
   }
 };
+
 
 // ===============================
 // SAVE RIDER LOCATION
@@ -266,7 +331,7 @@ exports.savePersonalInfo = async (req, res) => {
 // ------------------ VEHICLE -------------------
 exports.updateVehicle = async (req, res) => {
   try {
-    const riderId = req.rider?._id;
+    const riderId = req.rider._id;
     const { type } = req.body;
 
     // Basic required validation
@@ -380,7 +445,7 @@ exports.uploadSelfieController = async (req, res) => {
 
 exports.uploadPan = async (req, res) => {
   try {
-    const rider = req.rider;
+    const riderId = req.rider._id;
     const { panNumber } = req.body;
 
     if (!panNumber) {
@@ -393,7 +458,7 @@ exports.uploadPan = async (req, res) => {
 
     const imageUrl = await uploadToAzure(req.file, "pan");
 
-    await Rider.findByIdAndUpdate(rider._id, {
+    await Rider.findByIdAndUpdate(riderId, {
       "kyc.pan.number": panNumber.trim(),
       "kyc.pan.image": imageUrl,
       "kyc.pan.status": "pending",
@@ -468,7 +533,7 @@ exports.uploadDL = async (req, res) => {
       "kyc.drivingLicense.frontImage": frontUrl,
       "kyc.drivingLicense.backImage": backUrl,
       "kyc.drivingLicense.status": "pending",
-      onboardingStage: "KYC_SUBMITTED",
+      onboardingStage: "KYC_APPROVAL_PENDING",
       "onboardingProgress.dlUploaded": true,
     });
 
@@ -489,8 +554,8 @@ exports.uploadDL = async (req, res) => {
 
 exports.savePermissions = async (req, res) => {
   try {
-    const riderId = req.rider?._id;
-    console.log(riderId)
+    console.log("heloo")
+    const riderId = req.rider._id;
     if (!riderId) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -587,24 +652,32 @@ exports.getProfile = async (req, res) => {
 
 exports.logoutOrDelete = async (req, res) => {
   try {
-    await Rider.findByIdAndUpdate(req.rider._id, {
+    const riderId = req.rider._id;
+
+    await Rider.findByIdAndUpdate(riderId, {
+      refreshToken: null,
       deviceToken: null,
     });
 
     return res.json({
       success: true,
-      message: "Device token removed successfully",
+      message: "Logged out successfully",
     });
-  } catch (err) {
-    return res.status(500).json({ message: "Server error" });
+
+  } catch (error) {
+    console.error("Logout Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while logging out",
+    });
   }
-}
+};
 
 
 exports.onboardingStatus = async (req, res) => {
   try {
     // Validate rider from auth middleware
-    if (!req.rider || !req.rider._id) {
+    if (!req.rider._id) {
       return res.status(401).json({
         success: false,
         message: "Unauthorized: Rider token invalid",
@@ -653,6 +726,110 @@ exports.onboardingStatus = async (req, res) => {
     });
   }
 };
+
+
+
+exports.refreshAccessToken = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken)
+      return res.status(401).json({ success: false, message: "Refresh token required" });
+
+    // Verify refresh token
+    let decoded;
+    try {
+      decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+    } catch (err) {
+      return res.status(401).json({ success: false, message: "Invalid refresh token" });
+    }
+
+    const rider = await Rider.findById(decoded.riderId);
+
+    if (!rider || rider.refreshToken !== refreshToken) {
+      return res.status(401).json({ success: false, message: "Token mismatch" });
+    }
+
+    // Generate new access token
+    const accessToken = jwt.sign(
+      { riderId: rider._id },
+      process.env.JWT_ACCESS_SECRET,
+      { expiresIn: "15m" }
+    );
+
+    return res.json({
+      success: true,
+      accessToken,
+    });
+  } catch (error) {
+    console.error("Refresh Token ERROR →", error);
+    return res.status(500).json({ success: false, message: "Server error refreshing token" });
+  }
+};
+
+exports.deviceToken = async (req, res) => {
+  try {
+    const { deviceToken } = req.body;
+
+    if (!deviceToken) {
+      return res.status(400).json({
+        success: false,
+        message: "deviceToken is required",
+      });
+    }
+
+    await Rider.findByIdAndUpdate(req.rider._id, { deviceToken });
+
+    return res.json({
+      success: true,
+      message: "Device token saved successfully",
+    });
+
+  } catch (error) {
+    return res.status(500).json({ message: "Server error saving device token" });
+  }
+}
+
+
+exports.initializeApp = async (req, res) => {
+  try {
+    // riderAuthMiddleware already verified token
+    const riderId = req.rider._id;
+
+    const rider = await Rider.findById(riderId);
+
+    if (!rider) {
+      return res.json({
+        status: "INVALID_TOKEN",
+        message: "User not found"
+      });
+    }
+
+    // Fully registered → go to HOME
+    if (rider.isFullyRegistered) {
+      return res.json({
+        status: "FULLY_REGISTERED",
+        nextPage: "HOME",
+        rider
+      });
+    }
+
+    // Onboarding pending
+    return res.json({
+      status: "ONBOARDING_PENDING",
+      nextStage: rider.onboardingStage,
+      rider
+    });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      status: "ERROR",
+      message: "Server error"
+    });
+  }
+};
+
 
 
 

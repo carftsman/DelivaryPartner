@@ -27,7 +27,7 @@ exports.sendOtp = async (req, res) => {
   const { aadharNumber } = req.body;
 
   // Rider from middleware
-  const rider = req.rider;
+  const riderId = req.rider._id;
 
   // Save OTP temporarily
   otpStore[aadharNumber] = {
@@ -51,8 +51,8 @@ exports.verifyOtp = async (req, res) => {
     return res.status(400).json({ message: error.details[0].message });
 
   const { aadharNumber, otp } = req.body;
-  const rider = req.rider;
-  console.log(rider)
+  const riderId = req.rider._id;
+  // console.log(rider)
 
   const otpRecord = otpStore[aadharNumber];
   if (!otpRecord)
@@ -65,7 +65,7 @@ exports.verifyOtp = async (req, res) => {
     return res.status(400).json({ message: "Invalid OTP" });
 
   // OTP Success → Update Rider KYC
-  await Rider.findByIdAndUpdate(rider._id, {
+  await Rider.findByIdAndUpdate(riderId, {
     $set: {
       "onboardingProgress.aadharVerified": true,
       "kyc.aadhar.isVerified": true,

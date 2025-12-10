@@ -3,46 +3,58 @@ const Rider = require("../models/RiderModel");
 
 exports.riderAuthMiddleWare = async (req, res, next) => {
   try {
-    let token = req.headers.authorization;
+    const header = req.headers.authorization;
 
-    // No token → block request
-    if (!token || !token.startsWith("Bearer ")) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Authorization token missing" });
+    if (!header || !header.startsWith("Bearer ")) {
+      return res.status(401).json({
+        success: false,
+        message: "Authorization token missing",
+        error: "NO_TOKEN",
+      });
     }
 
-    token = token.split(" ")[1]; // remove "Bearer "
+    const token = header.split(" ")[1];
 
-    // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (!decoded || !decoded.riderId) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Invalid token" });
+    // Verify access token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+    } catch (err) {
+      if (err.name === "TokenExpiredError") {
+        return res.status(401).json({
+          success: false,
+          message: "Access token expired",
+          error: "ACCESS_TOKEN_EXPIRED",
+        });
+      }
+
+      return res.status(401).json({
+        success: false,
+        message: "Invalid access token",
+        error: "INVALID_TOKEN",
+      });
     }
 
-    // Check rider in DB
-    const rider = await Rider.findById(decoded.riderId);
+    // Validate rider in DB
+    const rider = await Rider.findById(decoded.riderId).select("_id phone");
     if (!rider) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Rider not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Rider not found",
+      });
     }
 
-    // Attaching rider to request object
-    req.rider = rider;
+    // Attach only essential rider data
+    req.rider = { _id: rider._id };
 
-    next(); // allow controller to run
+    next(); // move to controller
   } catch (error) {
     console.error("Auth Middleware Error:", error);
 
     return res.status(401).json({
       success: false,
-      message:
-        error.name === "TokenExpiredError"
-          ? "Session expired, please login again"
-          : "Authentication failed",
+      message: "Authentication failed",
+      error: "AUTH_ERROR",
     });
   }
 };

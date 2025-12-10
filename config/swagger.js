@@ -41,7 +41,7 @@ const swaggerSpec = swaggerJSDoc(options);
 
 const swaggerSetup = (app) => {
   app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-  console.log(`Swagger Documentation Loaded → http://localhost:${process.env.PORT}/api-docs`);
+  console.log(`Swagger Documentation Loaded →` , process.env.NODE_ENV == "production" ?"https://delivarypartner.onrender.com/api-docs":`http://localhost:${process.env.PORT}/api-docs`);
 };
 
 module.exports = { swaggerSetup };

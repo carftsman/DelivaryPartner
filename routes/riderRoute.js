@@ -15,6 +15,9 @@ const {
   savePermissions,
   logoutOrDelete,
   onboardingStatus,
+  refreshAccessToken,
+  deviceToken,
+  initializeApp,
 } = require("../controllers/riderRegisterController");
 
 const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
@@ -53,24 +56,66 @@ riderRouter.post("/auth/send-otp", sendOtp);
  * /api/auth/verify-otp:
  *   post:
  *     tags: [Auth]
- *     summary: Verify OTP and login/register rider
+ *     summary: Verify OTP and login rider
+ *     description: Verifies OTP, completes phone verification, creates access + refresh token pair.
+ *
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - phone
+ *               - otp
  *             properties:
  *               phone:
  *                 type: string
+ *                 example: "9876543210"
  *               otp:
  *                 type: string
+ *                 example: "123456"
+ *
  *     responses:
  *       200:
- *         description: OTP verified
+ *         description: OTP verified successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "OTP Verified"
+ *                 isNewUser:
+ *                   type: boolean
+ *                   example: true
+ *                 nextStage:
+ *                   type: string
+ *                   example: "APP_PERMISSIONS"
+ *                 accessToken:
+ *                   type: string
+ *                   example: "eyJhbGciOiJIUzI1NiIsInR..."
+ *                 refreshToken:
+ *                   type: string
+ *                   example: "eyJhbGciOiJIUzI1NiIsInR..."
+ *
+ *       400:
+ *         description: Missing phone or OTP / OTP not generated
+ *
  *       401:
- *         description: Invalid or expired OTP
+ *         description: Incorrect or expired OTP
+ *
+ *       404:
+ *         description: Rider not found
+ *
+ *       500:
+ *         description: Server error verifying OTP
  */
+
 riderRouter.post("/auth/verify-otp", verifyOtp);
 
 /**
@@ -609,19 +654,37 @@ riderRouter.get("/rider/profile", riderAuthMiddleWare, getProfile);
 
 /**
  * @swagger
- * /api/rider/device/token:
+ * /api/rider/logout:
  *   delete:
- *     tags: [Rider]
- *     summary: Delete device token when rider uninstalls the app or logout
+ *     tags: [Auth]
+ *     summary: Logout rider (removes refresh token & device token)
+ *     description: Clears the rider's refresh token and device token. Requires Bearer Auth.
  *     security:
  *       - bearerAuth: []
+ *
  *     responses:
  *       200:
- *         description: Token removed successfully
+ *         description: Logged out successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Logged out successfully"
+ *
  *       401:
- *         description: Unauthorized
+ *         description: Unauthorized (missing or invalid access token)
+ *
+ *       500:
+ *         description: Server error while logging out
  */
-riderRouter.delete("/rider/device/token", riderAuthMiddleWare,logoutOrDelete)
+
+riderRouter.delete("/rider/logout", riderAuthMiddleWare,logoutOrDelete)
 
 /**
  * @swagger
@@ -693,6 +756,157 @@ riderRouter.delete("/rider/device/token", riderAuthMiddleWare,logoutOrDelete)
  */
 
 riderRouter.get("/rider/onboarding-status", riderAuthMiddleWare,onboardingStatus)
+
+
+/**
+ * @swagger
+ * /api/auth/refresh-token:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Generate new access token using refresh token
+ *     description: Returns a new access token and rotates the refresh token. Does NOT require Bearer auth.
+ *
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - refreshToken
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *                 example: "eyJhbGciOiJIUzI1NiIsInR..."
+ *
+ *     responses:
+ *       200:
+ *         description: New access token generated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 accessToken:
+ *                   type: string
+ *                   example: "eyJhbGciOiJIUzI1NiIsInR..."
+ *                 refreshToken:
+ *                   type: string
+ *                   example: "eyJhbGciOiJIUzI1NiIsInR..." 
+ *
+ *       401:
+ *         description: Invalid or expired refresh token
+ *
+ *       500:
+ *         description: Server error refreshing token
+ */
+
+riderRouter.post("/auth/refresh-token", refreshAccessToken);
+
+/**
+ * @swagger
+ * /api/rider/device-token:
+ *   post:
+ *     tags: [Rider]
+ *     summary: Save or update rider device token (FCM token)
+ *     description: Stores the rider's device token used for push notifications. Requires Bearer Auth.
+ *     security:
+ *       - bearerAuth: []
+ *
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - deviceToken
+ *             properties:
+ *               deviceToken:
+ *                 type: string
+ *                 example: "d6G4fgP9sjX9k0W8eD12:APA91bGv3V..."
+ *                 description: FCM device token
+ *
+ *     responses:
+ *       200:
+ *         description: Device token saved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Device token saved successfully"
+ *
+ *       400:
+ *         description: Missing device token
+ *
+ *       401:
+ *         description: Unauthorized (Invalid or missing access token)
+ *
+ *       500:
+ *         description: Server error while saving device token
+ */
+
+riderRouter.post("/rider/device-token", riderAuthMiddleWare ,deviceToken )
+
+/**
+ * @swagger
+ * /api/rider/initialize:
+ *   get:
+ *     tags: [Auth]
+ *     summary: Initialize app - determine whether rider goes to home or onboarding
+ *     description: |
+ *       Returns rider onboarding status or final home screen status.
+ *       Requires a valid Access Token (handled in middleware).
+ *     security:
+ *       - bearerAuth: []
+ *
+ *     responses:
+ *       200:
+ *         description: Initialization result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: "FULLY_REGISTERED"
+ *                   description: |
+ *                     Possible values:
+ *                     - FULLY_REGISTERED → go to Home
+ *                     - ONBOARDING_PENDING → continue onboarding
+ *                 nextPage:
+ *                   type: string
+ *                   example: "HOME"
+ *                   description: Returned only when rider is fully registered
+ *                 nextStage:
+ *                   type: string
+ *                   example: "PERSONAL_INFO"
+ *                   description: Returned only when onboarding is pending
+ *                 rider:
+ *                   type: object
+ *                   description: Rider object data
+ *
+ *       401:
+ *         description: Unauthorized (token missing or invalid)
+ *
+ *       500:
+ *         description: Server error
+ */
+
+
+riderRouter.get("/rider/initialize", riderAuthMiddleWare, initializeApp);
+
+
 
 
 module.exports = riderRouter;
