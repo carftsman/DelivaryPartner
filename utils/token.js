@@ -4,7 +4,7 @@ exports.generateTokens = (rider) => {
   const accessToken = jwt.sign(
     { riderId: rider._id },
     process.env.JWT_ACCESS_SECRET,
-    { expiresIn: "15m" }  // short life
+    { expiresIn: "30d" }  // short life
   );
 
   const refreshToken = jwt.sign(
