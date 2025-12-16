@@ -6,7 +6,8 @@ const morgan = require("morgan");
 const riderRouter = require("./routes/riderRoute");
 const locationRouter = require("./routes/locationRoute");
 const aadharRoute = require("./routes/aadharRoutes");
-
+const notificationRouter = require("./routes/notificationRoute");
+const staticMobileOtpRoute = require("./routes/staticMobileOtpRoute");
 
 
 const app = express();
@@ -23,6 +24,8 @@ swaggerSetup(app);
 app.use("/api", riderRouter);
 app.use("/api/location", locationRouter);
 app.use("/aadhar", aadharRoute);
+app.use("/api/notifications", notificationRouter);
+app.use("/api/mobile", staticMobileOtpRoute);
 
 
 app.get("/", (req, res) => {
