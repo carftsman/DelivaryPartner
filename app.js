@@ -30,6 +30,10 @@ app.use("/aadhar", aadharRoute);
 
 app.use("/api/mobile",staticRouter);
 
+const adminRoutes = require("./routes/adminRoutes");
+app.use("/api/admin", adminRoutes);
+
+
 
 app.get("/", (req, res) => {
   res.send("Vega Delivery Partner API Running. Open /api-docs");
