@@ -10,6 +10,8 @@ const aadharRoute = require("./routes/aadharRoutes");
 
 const staticRouter = require("./routes/staticMobileOtpRoute");
 
+const offlineStoreRoute = require("./routes/offlineStoreRoute");
+
 
 
 const app = express();
@@ -32,6 +34,11 @@ app.use("/api/mobile",staticRouter);
 
 const adminRoutes = require("./routes/adminRoutes");
 app.use("/api/admin", adminRoutes);
+
+
+app.use("/api/offline-stores", offlineStoreRoute);
+
+app.use("/api/admin/offline-stores", offlineStoreRoute);
 
 
 
