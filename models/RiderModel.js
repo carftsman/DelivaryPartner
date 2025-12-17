@@ -111,6 +111,59 @@ const RiderSchema = new Schema(
         rejectionReason: String,
       },
     },
+    // Additional fields can be added as needed
+
+    bankDetails: {
+      bankName: { type: String, trim: true },
+
+      accountHolderName: { type: String, trim: true },
+
+      accountNumber: {
+        type: String,
+        trim: true,
+        minlength: 8,
+        maxlength: 20,
+      },
+
+      ifscCode: {
+        type: String,
+        trim: true,
+        uppercase: true,
+        match: /^[A-Z]{4}0[A-Z0-9]{6}$/
+      },
+
+      addedBankAccount: { type: Boolean, default: false }
+    },
+
+    kitDeliveryAddress: {
+      name: { type: String, trim: true },
+
+      mobileNumber: {
+        type: String,
+        match: /^[0-9]{10}$/
+      },
+
+      completeAddress: {
+        type: String,
+        trim: true,
+        minlength: 10,
+        maxlength: 200
+      },
+
+      landmark: { type: String, trim: true },
+
+      pincode: {
+        type: String,
+        match: /^[0-9]{6}$/
+      },
+
+      onboardingKitStatus: {
+        type: Boolean,
+        default: false
+      }
+    },
+
+
   },
   { timestamps: true }
 );

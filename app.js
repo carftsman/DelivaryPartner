@@ -8,6 +8,8 @@ const riderRouter = require("./routes/riderRoute");
 const locationRouter = require("./routes/locationRoute");
 const aadharRoute = require("./routes/aadharRoutes");
 
+const staticRouter = require("./routes/staticMobileOtpRoute");
+
 
 
 const app = express();
@@ -25,6 +27,8 @@ swaggerSetup(app);
 app.use("/api", riderRouter);
 app.use("/api/location", locationRouter);
 app.use("/aadhar", aadharRoute);
+
+app.use("/api/mobile",staticRouter);
 
 
 app.get("/", (req, res) => {
