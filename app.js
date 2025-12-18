@@ -7,6 +7,9 @@ const cors = require('cors')
 const riderRouter = require("./routes/riderRoute");
 const locationRouter = require("./routes/locationRoute");
 const aadharRoute = require("./routes/aadharRoutes");
+const bankDetailsRoutes = require("./routes/bankDetailsRoutes");
+
+
 
 const staticRouter = require("./routes/staticMobileOtpRoute");
 
@@ -29,6 +32,7 @@ swaggerSetup(app);
 app.use("/api", riderRouter);
 app.use("/api/location", locationRouter);
 app.use("/aadhar", aadharRoute);
+app.use("/api/bank", bankDetailsRoutes);
 
 app.use("/api/mobile",staticRouter);
 
