@@ -36,9 +36,9 @@ const adminRoutes = require("./routes/adminRoutes");
 app.use("/api/admin", adminRoutes);
 
 
-app.use("/api/offline-stores", offlineStoreRoute);
+// app.use("/api/offline-stores", offlineStoreRoute);
 
-app.use("/api/admin/offline-stores", offlineStoreRoute);
+// app.use("/api/admin/offline-stores", offlineStoreRoute);
 
 
 
