@@ -8,12 +8,13 @@ const riderRouter = require("./routes/riderRoute");
 const locationRouter = require("./routes/locationRoute");
 const aadharRoute = require("./routes/aadharRoutes");
 const bankDetailsRoutes = require("./routes/bankDetailsRoutes");
+const kitRouter = require("./routes/kitAddressRoutes");
 
 
 
 const staticRouter = require("./routes/staticMobileOtpRoute");
 
-const offlineStoreRoute = require("./routes/offlineStoreRoute");
+// const offlineStoreRoute = require("./routes/offlineStoreRoute");
 
 
 
@@ -38,6 +39,8 @@ app.use("/api/mobile",staticRouter);
 
 const adminRoutes = require("./routes/adminRoutes");
 app.use("/api/admin", adminRoutes);
+
+app.use("/api/rider", kitRouter);
 
 
 // app.use("/api/offline-stores", offlineStoreRoute);

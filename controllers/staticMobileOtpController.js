@@ -251,7 +251,7 @@ exports.refreshAccessToken = async (req, res) => {
 
     const decoded = jwt.verify(
       refreshToken,
-      process.env.JWT_SECRET
+      process.env.JWT_REFRESH_SECRET
     );
 
     if (decoded.type !== "refresh") {
