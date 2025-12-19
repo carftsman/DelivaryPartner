@@ -20,7 +20,24 @@ const staticRouter = require("./routes/staticMobileOtpRoute");
 
 const app = express();
 
-app.use(cors())
+// app.use(cors())
+app.use(
+  cors({
+    origin: "*", // You can restrict later to your frontend URL
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Accept",
+      "X-Requested-With",
+      "Origin",
+      "Content-Length",
+      "Content-Disposition"
+    ],
+    credentials: false // change to true ONLY if using cookies
+  })
+);
+
 app.use(express.json());
 app.use(helmet());
 app.use(morgan("dev"));

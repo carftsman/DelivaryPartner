@@ -12,7 +12,7 @@ adminRouter.put("/approve-kyc/:riderId", approveRiderKyc);
 
 /**
  * @swagger
- * /api/get-offline-stores:
+ * /api/admin/get-offline-stores:
  *   get:
  *     tags: [Offline Store]
  *     summary: Get all active offline stores
