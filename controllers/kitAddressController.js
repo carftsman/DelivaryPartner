@@ -4,39 +4,75 @@ exports.addKitAddress = async (req, res) => {
   try {
     const riderId = req.rider._id;
     const { name, completeAddress, pincode } = req.body;
- 
-   
-    if (!name || !completeAddress || !pincode) {
+
+    // Check for missing fields
+    if (!name?.trim() || !completeAddress?.trim() || !pincode?.trim()) {
       return res.status(400).json({
+        success: false,
         message: "Name, complete address and pincode are required",
       });
     }
- 
+
+    // Validate address length
+    if (completeAddress.length < 10 || completeAddress.length > 200) {
+      return res.status(400).json({
+        success: false,
+        message: "Complete address must be between 10 and 200 characters",
+      });
+    }
+
+    // Validate pincode (must be exactly 6 digits)
+    const pincodeRegex = /^[0-9]{6}$/;
+    if (!pincodeRegex.test(pincode)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid pincode. It must be a 6-digit number",
+      });
+    }
+
+    //Fetch rider
     const rider = await Rider.findById(riderId);
     if (!rider) {
-      return res.status(404).json({ message: "Rider not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Rider not found",
+      });
     }
- 
-    // Update only required fields
+
+    // only fully registered riders can add kit address
+    // if (!rider.isFullyRegistered) {
+    //   return res.status(403).json({
+    //     success: false,
+    //     message: "Complete KYC and onboarding to add kit delivery address",
+    //   });
+    // }
+
+    //Save kit address
     rider.kitDeliveryAddress = {
-      name,
-      completeAddress,
-      pincode,
+      name: name.trim(),
+      completeAddress: completeAddress.trim(),
+      pincode: pincode.trim(),
+      onboardingKitStatus: false, // keep default unless changed later
     };
- 
+
     await rider.save();
- 
-    res.status(200).json({
+
+    return res.status(200).json({
+      success: true,
       message: "Kit delivery address saved successfully",
       data: rider.kitDeliveryAddress,
     });
+
   } catch (error) {
-    res.status(500).json({
+    console.error("Add Kit Address Error:", error);
+    return res.status(500).json({
+      success: false,
       message: "Failed to save kit delivery address",
       error: error.message,
     });
   }
 };
+
  
  
 exports.getKitAddress = async (req, res) => {
