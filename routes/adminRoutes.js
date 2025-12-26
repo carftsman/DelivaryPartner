@@ -6,6 +6,8 @@ const {
   getOfflineStores,
 } = require("../controllers/offlineStoreController");
 
+const { createWeeklySlots } = require("../controllers/adminSlotController");
+
 
 
 adminRouter.put("/approve-kyc/:riderId", approveRiderKyc);
@@ -76,5 +78,7 @@ adminRouter.get("/get-offline-stores", getOfflineStores);
  *         description: Store created successfully
  */
 adminRouter.post("/offline-stores", createOfflineStore);
+
+adminRouter.post("/slots", createWeeklySlots);
 
 module.exports = adminRouter;
