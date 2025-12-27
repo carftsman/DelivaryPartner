@@ -59,10 +59,11 @@ app.use("/api/admin", adminRoutes);
 
 app.use("/api/rider", kitRouter);
 
-
 // app.use("/api/offline-stores", offlineStoreRoute);
 
 // app.use("/api/admin/offline-stores", offlineStoreRoute);
+
+app.use('/api/profile',require("./routes/profileRoutes"))
 
 
 

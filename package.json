@@ -4,7 +4,7 @@
   "engines": {
     "node": "20.x"
   },
-  "description": "",
+  "description": "To make it easy for you to get started with GitLab, here's a list of recommended next steps.",
   "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -26,7 +26,7 @@
     "helmet": "^8.1.0",
     "joi": "^18.0.2",
     "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.0.1",
+    "mongoose": "^9.0.2",
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
     "swagger-jsdoc": "^6.2.8",
@@ -37,5 +37,16 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.11"
-  }
+  },
+  "directories": {
+    "doc": "docs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/carftsman/DelivaryPartner.git"
+  },
+  "bugs": {
+    "url": "https://github.com/carftsman/DelivaryPartner/issues"
+  },
+  "homepage": "https://github.com/carftsman/DelivaryPartner#readme"
 }
