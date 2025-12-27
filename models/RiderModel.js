@@ -206,6 +206,7 @@ const RiderSchema = new Schema(
         "PAN_UPLOAD",
         "DL_UPLOAD",
         "KYC_SUBMITTED",
+        "KYC_APPROVAL_PENDING",
         "KYC_APPROVED",
         "COMPLETED",
       ],

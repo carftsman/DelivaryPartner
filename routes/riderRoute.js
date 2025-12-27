@@ -652,6 +652,8 @@ riderRouter.post(
  */
 riderRouter.get("/rider/profile", riderAuthMiddleWare, getProfile);
 
+
+
 /**
  * @swagger
  * /api/rider/logout:
