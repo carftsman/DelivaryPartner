@@ -1,20 +1,39 @@
+const mongoose = require("mongoose");
+const { Schema } = mongoose;
+ 
 const OrderSchema = new Schema(
   {
-    orderId: { type: String, index: true },
+    // Public Order ID
+    orderId: {
+      type: String,
+      required: true,
+      index: true,
+      unique: true
+    },
  
-    riderId: { type: Schema.Types.ObjectId, ref: "Rider" },
+    // Relations
+    riderId: {
+      type: Schema.Types.ObjectId,
+      ref: "Rider",
+      index: true
+    },
  
-    vendorShopName: String,
+    vendorShopName: {
+      type: String,
+      required: true
+    },
  
+    // Grocery Items
     items: [
       {
-        itemName: String,
-        quantity: Number,
-        price: Number,
-        total: Number
+        itemName: { type: String, required: true },
+        quantity: { type: Number, required: true },
+        price: { type: Number, required: true },   // per unit
+        total: { type: Number, required: true }    // quantity * price
       }
     ],
  
+    // Pickup (Store)
     pickupAddress: {
       name: String,
       lat: Number,
@@ -23,6 +42,7 @@ const OrderSchema = new Schema(
       contactNumber: String
     },
  
+    // Delivery (Customer)
     deliveryAddress: {
       name: String,
       lat: Number,
@@ -31,6 +51,7 @@ const OrderSchema = new Schema(
       contactNumber: String
     },
  
+    // Pricing
     pricing: {
       itemTotal: Number,
       deliveryFee: Number,
@@ -39,11 +60,13 @@ const OrderSchema = new Schema(
       totalAmount: Number
     },
  
+    // Rider Earning
     riderEarning: {
       amount: Number,
-      credited: Boolean
+      credited: { type: Boolean, default: false }
     },
  
+    // Order Status
     orderStatus: {
       type: String,
       enum: [
@@ -53,29 +76,44 @@ const OrderSchema = new Schema(
         "PICKED_UP",
         "DELIVERED",
         "CANCELLED"
-      ]
+      ],
+      default: "CREATED",
+      index: true
     },
  
+    // Cancellation
     cancelIssue: {
-      cancelledBy: String,
+      cancelledBy: {
+        type: String,
+        enum: ["CUSTOMER", "RIDER", "VENDOR", "ADMIN"]
+      },
       reasonCode: String,
       reasonText: String
     },
  
+    // Payment
     payment: {
-      mode: { type: String, enum: ["ONLINE", "COD"] },
-      status: { type: String, enum: ["PENDING", "SUCCESS", "FAILED", "REFUNDED"] },
+      mode: {
+        type: String,
+        enum: ["ONLINE", "COD"]
+      },
+      status: {
+        type: String,
+        enum: ["PENDING", "SUCCESS", "FAILED", "REFUNDED"]
+      },
       transactionId: String
     },
  
+    // Tracking summary
     tracking: {
       distanceInKm: Number,
       durationInMin: Number
     },
  
+    // Settlement flags
     settlement: {
-      riderEarningAdded: Boolean,
-      vendorSettled: Boolean
+      riderEarningAdded: { type: Boolean, default: false },
+      vendorSettled: { type: Boolean, default: false }
     }
   },
   { timestamps: true }

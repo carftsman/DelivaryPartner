@@ -130,6 +130,7 @@ const STATIC_OTP = "007007";
 // SEND STATIC OTP (NO CHANGE)
 // =========================
 exports.sendStaticMobileOtp = async (req, res) => {
+    console.log("hello");
   try {
     let { phone } = req.body;
 
