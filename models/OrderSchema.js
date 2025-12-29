@@ -1,5 +1,7 @@
+const mongoose=require('mongoose')
+const {Schema}=mongoose;
 const OrderSchema = new Schema(
-  {
+{
     orderId: { type: String, index: true },
  
     riderId: { type: Schema.Types.ObjectId, ref: "Rider" },
@@ -81,4 +83,8 @@ const OrderSchema = new Schema(
   { timestamps: true }
 );
  
-module.exports = mongoose.model("Order", OrderSchema);
+module.exports = mongoose.model(
+  "Order",
+  OrderSchema,
+  "order" // 👈 force exact collection name
+);
