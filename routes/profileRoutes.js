@@ -5,7 +5,7 @@ const {getProfile}=require('../controllers/profileController')
 const {getBankDetails}=require('../controllers/bankDetailsController')
 const {getKitAddress}=require('../controllers/kitAddressController')
 
-const { updateProfile,getAllDocuments,getWalletDetails } = require("../controllers/profileController");
+const { updateProfile,getAllDocuments,getWalletDetails,updateDocuments,getRiderOrderHistory } = require("../controllers/profileController");
 
 /**
  * @swagger
@@ -502,5 +502,189 @@ router.get("/documents", riderAuthMiddleWare, getAllDocuments);
  */
 
 router.get("/wallet", riderAuthMiddleWare, getWalletDetails);
+/**
+ * @swagger
+ * /api/profile/documents/update:
+ *   put:
+ *     summary: Update rider KYC documents
+ *     description: Update or re-upload rider documents like Aadhaar, PAN, License, etc. Used when documents expire or change.
+ *     tags:
+ *       - Profile
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               kyc:
+ *                 type: object
+ *                 example:
+ *                   aadhaar:
+ *                     number: "123456789012"
+ *                     status: "verified"
+ *                   pan:
+ *                     number: "ABCDE1234F"
+ *                     status: "pending"
+ *                   drivingLicense:
+ *                     number: "DL-0420110149646"
+ *                     expiryDate: "2026-12-31"
+ *                     status: "uploaded"
+ *     responses:
+ *       200:
+ *         description: Documents updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Documents updated successfully
+ *                 data:
+ *                   type: object
+ *       400:
+ *         description: Invalid input
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Rider not found
+ *       500:
+ *         description: Server error
+ */
+
+router.put(
+  "/documents/update",
+  riderAuthMiddleWare,        // your auth middleware
+  updateDocuments
+);
+/**
+ * @swagger
+ * /api/profile/orders/history:
+ *   get:
+ *     summary: Get rider order history
+ *     description: |
+ *       Fetch order history for the logged-in rider.
+ *       Supports filtering by **all**, **daily**, **weekly**, and **monthly** orders.
+ *       Also supports optional order status filtering.
+ *     tags:
+ *       - Profile
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: filter
+ *         schema:
+ *           type: string
+ *           enum: [all, daily, weekly, monthly]
+ *           default: all
+ *         description: Filter orders by time range
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum:
+ *             - CREATED
+ *             - CONFIRMED
+ *             - ASSIGNED
+ *             - PICKED_UP
+ *             - DELIVERED
+ *             - CANCELLED
+ *         description: Filter orders by order status
+ *     responses:
+ *       200:
+ *         description: Rider order history fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 filter:
+ *                   type: string
+ *                   example: weekly
+ *                 totalOrders:
+ *                   type: integer
+ *                   example: 2
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       _id:
+ *                         type: string
+ *                         example: 694e57ce48bc25e14034aab3
+ *                       orderId:
+ *                         type: string
+ *                         example: ORD-GURU-001
+ *                       vendorShopName:
+ *                         type: string
+ *                         example: Daily Needs Store
+ *                       orderStatus:
+ *                         type: string
+ *                         example: DELIVERED
+ *                       pricing:
+ *                         type: object
+ *                         properties:
+ *                           itemTotal:
+ *                             type: number
+ *                             example: 650
+ *                           deliveryFee:
+ *                             type: number
+ *                             example: 40
+ *                           tax:
+ *                             type: number
+ *                             example: 10
+ *                           platformCommission:
+ *                             type: number
+ *                             example: 20
+ *                           totalAmount:
+ *                             type: number
+ *                             example: 700
+ *                       riderEarning:
+ *                         type: object
+ *                         properties:
+ *                           amount:
+ *                             type: number
+ *                             example: 80
+ *                           credited:
+ *                             type: boolean
+ *                             example: true
+ *                       payment:
+ *                         type: object
+ *                         properties:
+ *                           mode:
+ *                             type: string
+ *                             example: ONLINE
+ *                           status:
+ *                             type: string
+ *                             example: SUCCESS
+ *                           transactionId:
+ *                             type: string
+ *                             example: TXN-GURU-001
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                         example: 2025-02-27T10:30:00.000Z
+ *       400:
+ *         description: Rider not found in request
+ *       401:
+ *         description: Unauthorized (invalid or missing token)
+ *       500:
+ *         description: Server error
+ */
+
+router.get(
+  "/orders/history",
+  riderAuthMiddleWare,
+  getRiderOrderHistory
+);
 
 module.exports=router;

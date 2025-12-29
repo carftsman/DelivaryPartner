@@ -1,15 +1,8 @@
-const mongoose = require("mongoose");
-const { Schema } = mongoose;
- 
+const mongoose=require('mongoose')
+const {Schema}=mongoose;
 const OrderSchema = new Schema(
-  {
-    // Public Order ID
-    orderId: {
-      type: String,
-      required: true,
-      index: true,
-      unique: true
-    },
+{
+    orderId: { type: String, index: true },
  
     // Relations
     riderId: {
@@ -119,4 +112,8 @@ const OrderSchema = new Schema(
   { timestamps: true }
 );
  
-module.exports = mongoose.model("Order", OrderSchema);
+module.exports = mongoose.model(
+  "Order",
+  OrderSchema,
+  "order" // 👈 force exact collection name
+);
