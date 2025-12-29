@@ -206,7 +206,9 @@ const RiderSchema = new Schema(
         "PAN_UPLOAD",
         "DL_UPLOAD",
         "KYC_SUBMITTED",
+        "KYC_APPROVAL_PENDING",
         "KYC_APPROVED",
+        "KYC_APPROVAL_PENDING",
         "COMPLETED",
         "KYC_APPROVAL_PENDING"
       ],
@@ -254,10 +256,13 @@ const RiderSchema = new Schema(
       email: { type: String },
     },
  
-    location: {
-        city: { type: String},
-        area: { type: String }
-    },
+location: {
+  streetAddress: { type: String },   
+  area: { type: String },            
+  city: { type: String },
+  state: { type: String },
+  pincode: { type: String }           
+},
  
     vehicleInfo: {
       type: { type: String, enum: ["ev", "bike", "scooty"] },  

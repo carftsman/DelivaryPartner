@@ -1,4 +1,12 @@
+<<<<<<< HEAD
 const Rider = require("../models/RiderModel");
+=======
+
+
+const Rider = require("../models/RiderModel");
+const Order = require("../models/OrderSchema");
+const mongoose=require('mongoose')
+>>>>>>> a08c058f27c42ff7af3d40be30691e845e5678e4
 
 exports.getProfile = async (req, res) => {
   try {
@@ -24,6 +32,7 @@ exports.getProfile = async (req, res) => {
         number: rider.phone?.number
       },
 
+<<<<<<< HEAD
       emergencyContact: {
         name: rider.emergencyContact?.name,
         phoneNumber: rider.emergencyContact?.phoneNumber
@@ -37,6 +46,24 @@ exports.getProfile = async (req, res) => {
         pincode: rider.location?.pincode     // ✅ added
       },
 
+=======
+      // emergencyContact: {
+      //   name: rider.emergencyContact?.name,
+      //   phoneNumber: rider.emergencyContact?.phoneNumber
+      // },
+
+      personalInfo: rider.personalInfo,
+
+            location: {
+        streetAddress: rider.location?.streetAddress,
+        area: rider.location?.area,
+        city: rider.location?.city,
+        state: rider.location?.state,
+        pincode: rider.location?.pincode
+      },
+
+
+>>>>>>> a08c058f27c42ff7af3d40be30691e845e5678e4
       // vehicleInfo: rider.vehicleInfo,
       selfie: rider.selfie,
 
@@ -222,8 +249,137 @@ exports.getWalletDetails = async (req, res) => {
     });
   }
 };
+<<<<<<< HEAD
+=======
+exports.updateDocuments = async (req, res) => {
+  try {
+    const riderId = req.rider._id;
+    const kycData = req.body.kyc; // expecting kyc object
+
+    if (!kycData || typeof kycData !== "object") {
+      return res.status(400).json({
+        success: false,
+        message: "KYC data is required"
+      });
+    }
+
+    const rider = await Rider.findById(riderId);
+
+    if (!rider) {
+      return res.status(404).json({
+        success: false,
+        message: "Rider not found"
+      });
+    }
+
+    // ✅ Merge existing KYC with new updates
+    rider.kyc = {
+      ...rider.kyc,
+      ...kycData
+    };
+
+    await rider.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Documents updated successfully",
+      data: rider.kyc
+    });
+
+  } catch (err) {
+    console.error("Update Documents Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
+  }
+};
+>>>>>>> a08c058f27c42ff7af3d40be30691e845e5678e4
 
 
 
 
 
+<<<<<<< HEAD
+=======
+
+exports.getRiderOrderHistory = async (req, res) => {
+  try {
+    const riderId = req.rider?._id || req.user?._id;
+    if (!riderId) {
+      return res.status(400).json({ success: false, message: "Rider missing" });
+    }
+
+    const riderObjectId = mongoose.Types.ObjectId.isValid(riderId)
+      ? new mongoose.Types.ObjectId(riderId)
+      : null;
+
+    const riderIdString = riderId.toString();
+    const { filter = "all", status } = req.query;
+
+    let dateFilter = {};
+    const now = new Date();
+
+    // ✅ UTC-safe filters
+    if (filter === "daily") {
+      const start = new Date(Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate(), 0, 0, 0
+      ));
+      const end = new Date(Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate(), 23, 59, 59, 999
+      ));
+      dateFilter = { createdAt: { $gte: start, $lte: end } };
+    }
+
+    if (filter === "weekly") {
+      const end = new Date();
+      const start = new Date();
+      start.setUTCDate(end.getUTCDate() - 6);
+      start.setUTCHours(0, 0, 0, 0);
+      dateFilter = { createdAt: { $gte: start, $lte: end } };
+    }
+
+    if (filter === "monthly") {
+      const start = new Date(Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(), 1, 0, 0, 0
+      ));
+      const end = new Date(Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth() + 1, 0, 23, 59, 59, 999
+      ));
+      dateFilter = { createdAt: { $gte: start, $lte: end } };
+    }
+
+    const query = {
+      riderId: {
+        $in: riderObjectId
+          ? [riderObjectId, riderIdString]
+          : [riderIdString]
+      },
+      ...dateFilter
+    };
+
+    if (status) query.orderStatus = status;
+
+    const orders = await Order.find(query)
+      .select("orderId vendorShopName orderStatus pricing riderEarning payment createdAt")
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      filter,
+      totalOrders: orders.length,
+      data: orders
+    });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+>>>>>>> a08c058f27c42ff7af3d40be30691e845e5678e4

@@ -130,6 +130,7 @@ const STATIC_OTP = "007007";
 // SEND STATIC OTP (NO CHANGE)
 // =========================
 exports.sendStaticMobileOtp = async (req, res) => {
+    console.log("hello");
   try {
     let { phone } = req.body;
 
@@ -210,7 +211,7 @@ exports.verifyStaticMobileOtp = async (req, res) => {
     const accessToken = jwt.sign(
       { riderId: rider._id, type: "access" },
       process.env.JWT_ACCESS_SECRET,
-      { expiresIn: "15m" }
+    //   { expiresIn: "15m" }
     );
 
     // REFRESH TOKEN (LONG LIVED)
