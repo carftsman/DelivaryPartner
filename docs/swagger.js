@@ -9,6 +9,8 @@ const options = {
       version: "1.0.0",
       description: "Rider Authentication + Registration + KYC APIs",
     },
+
+    
     servers: [
       {
         url: `http://localhost:${process.env.PORT}`,

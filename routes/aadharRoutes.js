@@ -40,6 +40,43 @@ const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
 
 aadharRoute.post("/send-otp", riderAuthMiddleWare, sendOtp);
 
+
+/**
+ * @swagger
+ * /aadhar/send-otp2:
+ *   post:
+ *     tags: [KYC 22]
+ *     summary: Send OTP to the rider's Aadhaar number
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - aadharNumber
+ *             properties:
+ *               aadharNumber:
+ *                 type: string
+ *                 example: "234567890123"
+ *     responses:
+ *       200:
+ *         description: OTP sent successfully
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "OTP sent successfully"
+ *               otp: "123456"
+ *       400:
+ *         description: Invalid Aadhaar number
+ *       401:
+ *         description: Unauthorized (missing or invalid token)
+ */
+
+aadharRoute.post("/send-otp2", riderAuthMiddleWare, sendOtp);
+
 /**
  * @swagger
  * /aadhar/verify-otp:

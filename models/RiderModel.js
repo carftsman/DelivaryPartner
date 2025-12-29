@@ -208,6 +208,7 @@ const RiderSchema = new Schema(
         "KYC_SUBMITTED",
         "KYC_APPROVED",
         "COMPLETED",
+        "KYC_APPROVAL_PENDING"
       ],
       default: "PHONE_VERIFICATION",
     },
