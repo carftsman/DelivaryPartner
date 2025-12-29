@@ -10,9 +10,9 @@ const aadharRoute = require("./routes/aadharRoutes");
 const bankDetailsRoutes = require("./routes/bankDetailsRoutes");
 const kitRouter = require("./routes/kitAddressRoutes");
 const slotRouter = require("./routes/slotsRoutes");
-
-
+const adminRoutes = require("./routes/adminRoutes");
 const staticRouter = require("./routes/staticMobileOtpRoute");
+const profileRoutes = require("./routes/profileRoutes")
 
 // const offlineStoreRoute = require("./routes/offlineStoreRoute");
 
@@ -54,7 +54,6 @@ app.use("/api/bank", bankDetailsRoutes);
 
 app.use("/api/mobile",staticRouter);
 
-const adminRoutes = require("./routes/adminRoutes");
 app.use("/api/admin", adminRoutes);
 
 app.use("/api/rider", kitRouter);
@@ -64,7 +63,7 @@ app.use("/api/slots", slotRouter);
 
 // app.use("/api/admin/offline-stores", offlineStoreRoute);
 
-app.use('/api/profile',require("./routes/profileRoutes"))
+app.use('/api/profile',profileRoutes)
 
 
 
