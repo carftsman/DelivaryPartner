@@ -8,31 +8,34 @@ const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
  * @swagger
  * /api/slots/week:
  *   get:
- *     tags: [Slots]
- *     summary: Get weekly slots for a city & zone
- *     description: Fetch all active slots for a given week number and year. If weekNumber/year are not provided, current week is used.
+ *     summary: Get weekly slots with date and day name
+ *     description: Fetch slot list for a given week, city, and zone. Shows each day with its date, day name, and active slots.
+ *     tags:
+ *       - Slots
+ *
  *     parameters:
  *       - in: query
  *         name: city
  *         required: true
  *         schema:
  *           type: string
+ *         description: City name
  *         example: Hyderabad
- *         description: City of the rider
  *
  *       - in: query
  *         name: zone
  *         required: true
  *         schema:
  *           type: string
+ *         description: Zone name
  *         example: Gachibowli
- *         description: Operational zone inside the city
  *
  *       - in: query
  *         name: weekNumber
  *         required: false
  *         schema:
  *           type: number
+ *         description: Week number (1–52). Defaults to current week.
  *         example: 49
  *
  *       - in: query
@@ -40,6 +43,7 @@ const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
  *         required: false
  *         schema:
  *           type: number
+ *         description: Year. Defaults to current year.
  *         example: 2025
  *
  *     responses:
@@ -47,47 +51,43 @@ const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
  *         description: Weekly slots fetched successfully
  *         content:
  *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: Weekly slots fetched
- *                 weekNumber:
- *                   type: number
- *                   example: 49
- *                 year:
- *                   type: number
- *                   example: 2025
- *                 count:
- *                   type: number
- *                   example: 7
- *                 data:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       date:
- *                         type: string
- *                         example: "2025-12-01"
- *                       startTime:
- *                         type: string
- *                         example: "18:00"
- *                       endTime:
- *                         type: string
- *                         example: "22:00"
- *                       isPeakSlot:
- *                         type: boolean
- *                         example: true
+ *             example:
+ *               success: true
+ *               message: "Weekly slots fetched"
+ *               weekNumber: 49
+ *               year: 2025
+ *               count: 7
+ *               data:
+ *                 - date: "2025-12-01"
+ *                   dayName: "Mon"
+ *                   weekNumber: 49
+ *                   year: 2025
+ *                   city: "Hyderabad"
+ *                   zone: "Gachibowli"
+ *                   slots:
+ *                     - slotId: "677fc1000000000000000011"
+ *                       startTime: "06:00"
+ *                       endTime: "08:00"
+ *                       durationInHours: 2
+ *                       maxRiders: 40
+ *                       bookedRiders: 1
+ *                       status: "ACTIVE"
  *
  *       400:
- *         description: Missing required query params
+ *         description: Missing required parameters
+ *         content:
+ *           application/json:
+ *             example: 
+ *               success: false
+ *               message: "City is required"
  *
  *       500:
  *         description: Server error
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: false
+ *               message: "Server error"
  */
 
 
@@ -548,31 +548,33 @@ slotRouter.get("/status", riderAuthMiddleWare, getDailySlotsWithStatus);
  * @swagger
  * /api/slots/history:
  *   get:
+ *     summary: Get weekly slot history for rider
+ *     description: >
+ *       Returns slot history for the selected week.  
+ *       Includes weekly summary (completed, cancelled, no-shows, failed)  
+ *       and day-wise slot details for all 7 days — even if the rider has no bookings on some days.
+ *
  *     tags:
  *       - Slots
- *     summary: Get weekly slot history for a rider
- *     description: |
- *       Returns ZIPTO-style weekly summary + 7-day breakdown of booked/cancelled/completed/no-show slots.  
- *       Rider must be authenticated.  
- *       
- *       **Filters by weekNumber & year**.
+ *
+ *     security:
+ *       - bearerAuth: []
+ *
  *     parameters:
  *       - in: query
  *         name: weekNumber
  *         required: true
  *         schema:
  *           type: integer
- *           example: 49
- *         description: Week number (1–53)
+ *         description: ISO Week number (1–53)
+ *
  *       - in: query
  *         name: year
  *         required: false
  *         schema:
  *           type: integer
- *           example: 2025
- *         description: Year (defaults to current year)
- *     security:
- *       - bearerAuth: []
+ *         description: Year (defaults to current year if empty)
+ *
  *     responses:
  *       200:
  *         description: Weekly slot history fetched successfully
@@ -581,41 +583,59 @@ slotRouter.get("/status", riderAuthMiddleWare, getDailySlotsWithStatus);
  *             example:
  *               success: true
  *               message: "Weekly slot history fetched"
- *               weekNumber: 49
+ *               weekNumber: 51
  *               year: 2025
  *               summary:
- *                 totalSlots: 12
- *                 completed: 8
- *                 cancelled: 2
+ *                 totalSlots: 5
+ *                 completed: 2
+ *                 cancelled: 1
  *                 noShow: 1
  *                 failed: 1
  *               days:
- *                 - date: "2025-12-01"
- *                   totalSlots: 2
- *                   completed: 1
+ *                 - date: "2025-12-15"
+ *                   totalSlots: 0
+ *                   completed: 0
+ *                   cancelled: 0
+ *                   noShow: 0
+ *                   failed: 0
+ *                   slots: []
+ *                 - date: "2025-12-16"
+ *                   totalSlots: 1
+ *                   completed: 0
  *                   cancelled: 1
  *                   noShow: 0
  *                   failed: 0
  *                   slots:
- *                     - _id: "694f826b83d90fd11dac433f"
- *                       startTime: "08:00"
- *                       endTime: "10:00"
- *                       status: "COMPLETED"
- *                     - _id: "694f826b83d90fd11dac433a"
+ *                     - _id: "65abd3fe283f91578bc12344"
+ *                       date: "2025-12-16"
+ *                       slotId: "677fc1ab0000000000000156"
  *                       startTime: "10:00"
  *                       endTime: "12:00"
  *                       status: "CANCELLED_BY_RIDER"
+ *
  *       400:
- *         description: Missing required query parameters
+ *         description: Missing or invalid parameters
  *         content:
  *           application/json:
  *             example:
  *               success: false
  *               message: "weekNumber is required"
+ *
  *       401:
- *         description: Unauthorized (missing or invalid token)
+ *         description: Unauthorized (Missing or invalid token)
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: false
+ *               message: "Unauthorized"
+ *
  *       500:
- *         description: Server error
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: false
+ *               message: "Server error"
  */
 
 
