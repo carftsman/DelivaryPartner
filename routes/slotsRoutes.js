@@ -1,7 +1,7 @@
 const express = require("express");
 const slotRouter = express.Router();
 
-const { getWeeklySlots, getDailySlots ,bookSlot , cancelSlot ,getCurrentSlot ,getDailySlotsWithStatus} = require("../controllers/slotsController");
+const { getWeeklySlots, getDailySlots ,bookSlot , cancelSlot ,getCurrentSlot ,getDailySlotsWithStatus, getSlotHistory} = require("../controllers/slotsController");
 const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
 
 /**
@@ -179,12 +179,11 @@ slotRouter.get("/day", getDailySlots);
  * @swagger
  * /api/slots/book:
  *   post:
- *     summary: Book a rider slot
- *     description: Allows a fully registered rider to book a slot for a specific date.
- *     tags:
- *       - Slots
+ *     summary: Book multiple slots at once for a rider
+ *     tags: [Slots]
  *     security:
  *       - bearerAuth: []
+ *
  *     requestBody:
  *       required: true
  *       content:
@@ -193,19 +192,22 @@ slotRouter.get("/day", getDailySlots);
  *             type: object
  *             required:
  *               - date
- *               - slotId
+ *               - slotIds
  *             properties:
  *               date:
  *                 type: string
  *                 example: "2025-12-01"
- *                 description: Slot date (YYYY-MM-DD)
- *               slotId:
- *                 type: string
- *                 example: "677fc1000000000000000011"
- *                 description: ID of the slot inside slots[] array
+ *                 description: Date of the slots (YYYY-MM-DD)
+ *               slotIds:
+ *                 type: array
+ *                 description: List of slot IDs to book
+ *                 items:
+ *                   type: string
+ *                 example: ["677fc1000000000000000011", "677fc1000000000000000012"]
+ *
  *     responses:
  *       200:
- *         description: Slot booked successfully
+ *         description: Slots booked successfully
  *         content:
  *           application/json:
  *             schema:
@@ -216,42 +218,47 @@ slotRouter.get("/day", getDailySlots);
  *                   example: true
  *                 message:
  *                   type: string
- *                   example: Slot booked successfully
- *                 data:
- *                   type: object
+ *                   example: "Slots booked successfully"
+ *                 bookedCount:
+ *                   type: number
+ *                   example: 2
+ *                 failedCount:
+ *                   type: number
+ *                   example: 1
+ *                 booked:
+ *                   type: array
+ *                   description: List of successfully booked slots
+ *                   items:
+ *                     type: object
+ *                 failed:
+ *                   type: array
+ *                   description: Slots that failed booking
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       slotId:
+ *                         type: string
+ *                         example: "677fc1000000000000000015"
+ *                       reason:
+ *                         type: string
+ *                         example: "Slot is full"
+ *
  *       400:
- *         description: Missing params or already booked or slot full/inactive
+ *         description: Invalid request / Some slots failed
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 message:
- *                   type: string
- *       403:
- *         description: Rider not fully registered
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 message:
- *                   type: string
- *       404:
- *         description: Slot or day slot not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 message:
- *                   type: string
+ *               example:
+ *                 success: false
+ *                 message: "No valid slots to book"
+ *                 failed:
+ *                   - slotId: "677fc1000000000000000017"
+ *                     reason: "Already booked"
+ *
+ *       401:
+ *         description: Unauthorized (Missing or invalid token)
+ *
  *       500:
  *         description: Server error
  */
@@ -415,7 +422,204 @@ slotRouter.delete("/cancel/:bookingId", riderAuthMiddleWare, cancelSlot);
 
 
 slotRouter.get("/current", riderAuthMiddleWare, getCurrentSlot);
+
+/**
+ * @swagger
+ * /api/slots/status:
+ *   get:
+ *     tags:
+ *       - Slots
+ *     summary: Get daily slots with booking status
+ *     description: >
+ *       Returns all slots for a specific date, city, and zone, including rider-specific booking status.  
+ *       Filters:
+ *       - **status=all** → all slots (available, booked, cancelled)  
+ *       - **status=booked** → only slots booked by rider  
+ *       - **status=cancelled** → only cancelled slots by rider  
+ *       Requires Authorization header.
+ *
+ *     security:
+ *       - bearerAuth: []
+ *
+ *     parameters:
+ *       - in: query
+ *         name: date
+ *         required: true
+ *         description: Date in YYYY-MM-DD format
+ *         schema:
+ *           type: string
+ *           example: "2025-12-01"
+ *
+ *       - in: query
+ *         name: city
+ *         required: true
+ *         description: City name
+ *         schema:
+ *           type: string
+ *           example: "Hyderabad"
+ *
+ *       - in: query
+ *         name: zone
+ *         required: true
+ *         description: Zone name
+ *         schema:
+ *           type: string
+ *           example: "Gachibowli"
+ *
+ *       - in: query
+ *         name: status
+ *         required: false
+ *         description: >
+ *           Filter results:  
+ *           - all (default)  
+ *           - booked  
+ *           - cancelled
+ *         schema:
+ *           type: string
+ *           enum: [all,available, booked, cancelled]
+ *           example: "all"
+ *
+ *     responses:
+ *       200:
+ *         description: Daily slots fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 date:
+ *                   type: string
+ *                   example: "2025-12-01"
+ *                 count:
+ *                   type: number
+ *                   example: 9
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       slotId:
+ *                         type: string
+ *                         example: "677fc1000000000000000011"
+ *                       startTime:
+ *                         type: string
+ *                         example: "06:00"
+ *                       endTime:
+ *                         type: string
+ *                         example: "08:00"
+ *                       isBooked:
+ *                         type: boolean
+ *                         example: true
+ *                       isCancelled:
+ *                         type: boolean
+ *                         example: false
+ *                       bookingId:
+ *                         type: string
+ *                         nullable: true
+ *                         example: "6950aa2e12cdfe123ac99871"
+ *                       bookingStatus:
+ *                         type: string
+ *                         example: "BOOKED"
+ *
+ *       400:
+ *         description: Missing required params
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: false
+ *               message: "Date, city and zone are required"
+ *
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: false
+ *               message: "Server error"
+ */
+
 slotRouter.get("/status", riderAuthMiddleWare, getDailySlotsWithStatus);
+
+
+/**
+ * @swagger
+ * /api/slots/history:
+ *   get:
+ *     tags:
+ *       - Slots
+ *     summary: Get weekly slot history for a rider
+ *     description: |
+ *       Returns ZIPTO-style weekly summary + 7-day breakdown of booked/cancelled/completed/no-show slots.  
+ *       Rider must be authenticated.  
+ *       
+ *       **Filters by weekNumber & year**.
+ *     parameters:
+ *       - in: query
+ *         name: weekNumber
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 49
+ *         description: Week number (1–53)
+ *       - in: query
+ *         name: year
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           example: 2025
+ *         description: Year (defaults to current year)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Weekly slot history fetched successfully
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               message: "Weekly slot history fetched"
+ *               weekNumber: 49
+ *               year: 2025
+ *               summary:
+ *                 totalSlots: 12
+ *                 completed: 8
+ *                 cancelled: 2
+ *                 noShow: 1
+ *                 failed: 1
+ *               days:
+ *                 - date: "2025-12-01"
+ *                   totalSlots: 2
+ *                   completed: 1
+ *                   cancelled: 1
+ *                   noShow: 0
+ *                   failed: 0
+ *                   slots:
+ *                     - _id: "694f826b83d90fd11dac433f"
+ *                       startTime: "08:00"
+ *                       endTime: "10:00"
+ *                       status: "COMPLETED"
+ *                     - _id: "694f826b83d90fd11dac433a"
+ *                       startTime: "10:00"
+ *                       endTime: "12:00"
+ *                       status: "CANCELLED_BY_RIDER"
+ *       400:
+ *         description: Missing required query parameters
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: false
+ *               message: "weekNumber is required"
+ *       401:
+ *         description: Unauthorized (missing or invalid token)
+ *       500:
+ *         description: Server error
+ */
+
+
+slotRouter.get("/history", riderAuthMiddleWare, getSlotHistory);
 
 
 module.exports = slotRouter;
