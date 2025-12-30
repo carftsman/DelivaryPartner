@@ -342,6 +342,17 @@ location: {
     type: String,
     trim: true
   },
+
+  accountType:
+  {
+    type:String,
+    enum:["CURRENT","SAVINGS"]
+  },
+  branch:
+  {
+    type:String,
+    
+  },
  
   accountNumber: {
     type: String,

@@ -123,16 +123,15 @@ router.put("/update", riderAuthMiddleWare, updateProfile);
  * @swagger
  * /api/profile/rider/profile:
  *   get:
+ *     summary: Get Rider Profile
+ *     description: >
+ *       Fetches the logged-in rider's profile details including personal info,
+ *       contact details, location, selfie, and onboarding status.
+ *       Internal or empty fields are removed before sending response.
  *     tags:
  *       - Profile
- *     summary: Get rider profile
- *     description: >
- *       Fetch the logged-in rider’s profile with clean and required fields only.
- *       This API excludes wallet details, bank details, KYC documents,
- *       permissions, boolean flags, and other internal system fields.
- *       Empty or undefined fields are automatically removed from the response.
  *     security:
- *       - bearerAuth: []
+ *       - BearerAuth: []
  *     responses:
  *       200:
  *         description: Profile fetched successfully
@@ -152,7 +151,8 @@ router.put("/update", riderAuthMiddleWare, updateProfile);
  *                   properties:
  *                     _id:
  *                       type: string
- *                       example: 694e527648bc25e14034aab0
+ *                       example: 694fa3df48bc25e14034aaf1
+ *
  *                     phone:
  *                       type: object
  *                       properties:
@@ -162,48 +162,69 @@ router.put("/update", riderAuthMiddleWare, updateProfile);
  *                         number:
  *                           type: string
  *                           example: "9988123456"
+ *
  *                     personalInfo:
  *                       type: object
  *                       properties:
  *                         fullName:
  *                           type: string
- *                           example: GuruNath
+ *                           example: Hhhh
  *                         dob:
  *                           type: string
- *                           format: date
- *                           example: 1995-05-10
+ *                           format: date-time
+ *                           example: 2025-12-29T00:00:00.000Z
+ *                         gender:
+ *                           type: string
+ *                           example: male
+ *                         primaryPhone:
+ *                           type: string
+ *                           example: "6666666666"
+ *                         secondaryPhone:
+ *                           type: string
+ *                           example: "6639666636"
+ *                         email:
+ *                           type: string
+ *                           example: h@gmail.com
+ *
  *                     location:
  *                       type: object
  *                       properties:
- *                         city:
+ *                         streetAddress:
  *                           type: string
- *                           example: Visakhapatnam
+ *                           example: kphb
  *                         area:
  *                           type: string
- *                           example: Dwaraka Nagar
- *                     vehicleInfo:
- *                       type: object
- *                       properties:
- *                         type:
+ *                           example: KPHB Colony
+ *                         city:
  *                           type: string
- *                           example: bike
+ *                           example: Hyderabad
+ *                         state:
+ *                           type: string
+ *                           example: Telangana
+ *                         pincode:
+ *                           type: string
+ *                           example: "500085"
+ *
  *                     selfie:
  *                       type: object
  *                       properties:
  *                         url:
  *                           type: string
- *                           example: https://deliverypartner.blob.core.windows.net/delivery/selfies/selfie.jpg
+ *                           example: https://deliverypartner.blob.core.windows.net/delivery/selfies/1767010530491.jpg
  *                         uploadedAt:
  *                           type: string
  *                           format: date-time
- *                           example: 2025-12-26T10:14:20.586Z
+ *                           example: 2025-12-29T12:15:31.741Z
+ *
  *                     onboardingStage:
  *                       type: string
  *                       example: KYC_APPROVAL_PENDING
+ *
  *                     lastOtpVerifiedAt:
  *                       type: string
  *                       format: date-time
  *                       example: 2025-01-01T00:00:00.000Z
+ *
  *       404:
  *         description: Rider not found
  *         content:
@@ -217,6 +238,10 @@ router.put("/update", riderAuthMiddleWare, updateProfile);
  *                 message:
  *                   type: string
  *                   example: Rider not found
+ *
+ *       401:
+ *         description: Unauthorized – Invalid or missing token
+ *
  *       500:
  *         description: Server error
  *         content:
@@ -265,6 +290,12 @@ router.get("/rider/profile", riderAuthMiddleWare, getProfile);
  *                         bankName:
  *                           type: string
  *                           example: HDFC Bank
+ *                            accountType:
+ *                            type: string
+ *                            example: SAVINGS
+ *                            branch:
+ *                            type: string
+ *                            example: miyapur
  *                         accountHolderName:
  *                           type: string
  *                           example: Jagadeesh Kumar
