@@ -24,6 +24,8 @@ exports.addOrUpdateBankDetails = async (req, res) => {
           ifscCode,
           addedBankAccount: true,
         },
+         ifscVerificationStatus: "PENDING",
+    bankVerificationStatus: "PENDING",
       },
     });
 
@@ -45,12 +47,16 @@ exports.addOrUpdateBankDetails = async (req, res) => {
  */
 exports.getBankDetails = async (req, res) => {
   try {
-    const rider = await Rider.findById(req.rider._id).select("bankDetails");
+    const rider = await Rider.findById(req.rider._id).select("bankDetails ifscVerificationStatus bankVerificationStatus");
 
     return res.status(200).json({
       success: true,
-      data: rider?.bankDetails || {},
-    });
+      data: {
+    ...rider?.bankDetails?.toObject(),
+    ifscVerificationStatus: rider?.ifscVerificationStatus || "PENDING",
+    bankVerificationStatus: rider?.bankVerificationStatus || "PENDING",
+  },
+});
   } catch (error) {
     console.error("Get Bank Error:", error);
     return res.status(500).json({
@@ -66,13 +72,15 @@ exports.getBankDetails = async (req, res) => {
 exports.getBankDetailsStatus = async (req, res) => {
   try {
     const rider = await Rider.findById(req.rider._id).select(
-      "bankDetails.addedBankAccount"
+      "bankDetails.addedBankAccount ifscVerificationStatus bankVerificationStatus"
     );
 
     return res.status(200).json({
-      success: true,
-      addedBankAccount: rider?.bankDetails?.addedBankAccount || false,
-    });
+  success: true,
+  addedBankAccount: rider?.bankDetails?.addedBankAccount || false,
+  ifscVerificationStatus: rider?.ifscVerificationStatus || "PENDING",
+  bankVerificationStatus: rider?.bankVerificationStatus || "PENDING",
+});
   } catch (error) {
     console.error("Status Error:", error);
     return res.status(500).json({
@@ -90,6 +98,8 @@ exports.deleteBankDetails = async (req, res) => {
     await Rider.findByIdAndUpdate(req.rider._id, {
       $set: {
         bankDetails: { addedBankAccount: false },
+        ifscVerificationStatus: "PENDING",
+        bankVerificationStatus: "PENDING",
       },
     });
 

@@ -235,12 +235,13 @@ router.put("/update", riderAuthMiddleWare, updateProfile);
 router.get("/rider/profile", riderAuthMiddleWare, getProfile);
 // Get bank details
 /**
+ /**
  * @swagger
  * /api/profile/bank-details:
  *   get:
  *     tags: [Profile]
  *     summary: Get rider bank details
- *     description: Fetches saved bank account details for the authenticated rider.
+ *     description: Fetches saved bank account details along with IFSC and bank verification status for the authenticated rider.
  *     security:
  *       - bearerAuth: []
  *
@@ -258,21 +259,29 @@ router.get("/rider/profile", riderAuthMiddleWare, getProfile);
  *                 data:
  *                   type: object
  *                   properties:
- *                     bankName:
+ *                     bankDetails:
+ *                       type: object
+ *                       properties:
+ *                         bankName:
+ *                           type: string
+ *                           example: HDFC Bank
+ *                         accountHolderName:
+ *                           type: string
+ *                           example: Jagadeesh Kumar
+ *                         accountNumber:
+ *                           type: string
+ *                           example: "123456789012"
+ *                         ifscCode:
+ *                           type: string
+ *                           example: HDFC0001234
+ *                     ifscVerificationStatus:
  *                       type: string
- *                       example: HDFC Bank
- *                     accountHolderName:
+ *                       enum: [PENDING, VERIFIED, FAILED]
+ *                       example: VERIFIED
+ *                     bankVerificationStatus:
  *                       type: string
- *                       example: Jagadeesh Kumar
- *                     accountNumber:
- *                       type: string
- *                       example: "123456789012"
- *                     ifscCode:
- *                       type: string
- *                       example: HDFC0001234
- *                     addedBankAccount:
- *                       type: boolean
- *                       example: true
+ *                       enum: [PENDING, VERIFIED, FAILED]
+ *                       example: PENDING
  *
  *       401:
  *         description: Unauthorized or invalid token
@@ -280,8 +289,8 @@ router.get("/rider/profile", riderAuthMiddleWare, getProfile);
  *       500:
  *         description: Server error
  */
-
 router.get("/bank-details", riderAuthMiddleWare, getBankDetails);
+
 // Get kit address
  
 /**

@@ -1,12 +1,8 @@
-<<<<<<< HEAD
-const Rider = require("../models/RiderModel");
-=======
 
 
 const Rider = require("../models/RiderModel");
 const Order = require("../models/OrderSchema");
 const mongoose=require('mongoose')
->>>>>>> a08c058f27c42ff7af3d40be30691e845e5678e4
 
 exports.getProfile = async (req, res) => {
   try {
@@ -32,21 +28,6 @@ exports.getProfile = async (req, res) => {
         number: rider.phone?.number
       },
 
-<<<<<<< HEAD
-      emergencyContact: {
-        name: rider.emergencyContact?.name,
-        phoneNumber: rider.emergencyContact?.phoneNumber
-      },
-
-      personalInfo: rider.personalInfo,
-
-      location: {
-        city: rider.location?.city,
-        area: rider.location?.area,
-        pincode: rider.location?.pincode     // ✅ added
-      },
-
-=======
       // emergencyContact: {
       //   name: rider.emergencyContact?.name,
       //   phoneNumber: rider.emergencyContact?.phoneNumber
@@ -63,7 +44,6 @@ exports.getProfile = async (req, res) => {
       },
 
 
->>>>>>> a08c058f27c42ff7af3d40be30691e845e5678e4
       // vehicleInfo: rider.vehicleInfo,
       selfie: rider.selfie,
 
@@ -249,8 +229,6 @@ exports.getWalletDetails = async (req, res) => {
     });
   }
 };
-<<<<<<< HEAD
-=======
 exports.updateDocuments = async (req, res) => {
   try {
     const riderId = req.rider._id;
@@ -294,14 +272,11 @@ exports.updateDocuments = async (req, res) => {
     });
   }
 };
->>>>>>> a08c058f27c42ff7af3d40be30691e845e5678e4
 
 
 
 
 
-<<<<<<< HEAD
-=======
 
 exports.getRiderOrderHistory = async (req, res) => {
   try {
@@ -382,4 +357,3 @@ exports.getRiderOrderHistory = async (req, res) => {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
->>>>>>> a08c058f27c42ff7af3d40be30691e845e5678e4

@@ -1,3 +1,8 @@
+const mongoose=require('mongoose');
+
+const {Schema}=mongoose;
+
+
 const IncentiveSchema = new Schema(
   {
     title: String,

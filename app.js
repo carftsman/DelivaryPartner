@@ -9,16 +9,12 @@ const locationRouter = require("./routes/locationRoute");
 const aadharRoute = require("./routes/aadharRoutes");
 const bankDetailsRoutes = require("./routes/bankDetailsRoutes");
 const kitRouter = require("./routes/kitAddressRoutes");
-<<<<<<< HEAD
-const profileRouter=require("./routes/profileRoute")
-
-
-=======
 const slotRouter = require("./routes/slotsRoutes");
 const adminRoutes = require("./routes/adminRoutes");
->>>>>>> a08c058f27c42ff7af3d40be30691e845e5678e4
 const staticRouter = require("./routes/staticMobileOtpRoute");
-const profileRoutes = require("./routes/profileRoutes")
+const profileRoutes = require("./routes/profileRoutes");
+const incentiveRoutes = require("./routes/incentiveRoutes");
+
 
 // const offlineStoreRoute = require("./routes/offlineStoreRoute");
 
@@ -63,13 +59,7 @@ app.use("/api/mobile",staticRouter);
 app.use("/api/admin", adminRoutes);
 
 app.use("/api/rider", kitRouter);
-<<<<<<< HEAD
-
-app.use("/",profileRouter)
-
-=======
 app.use("/api/slots", slotRouter);
->>>>>>> a08c058f27c42ff7af3d40be30691e845e5678e4
 
 // app.use("/api/offline-stores", offlineStoreRoute);
 
@@ -77,7 +67,7 @@ app.use("/api/slots", slotRouter);
 
 app.use('/api/profile',profileRoutes)
 
-
+app.use("/api/home", incentiveRoutes);
 
 app.get("/", (req, res) => {
   res.send("Vega Delivery Partner API Running. Open /api-docs");

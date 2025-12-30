@@ -309,27 +309,84 @@ location: {
     },
     // Additional fields can be added as needed
  
-    bankDetails: {
-      bankName: { type: String, trim: true },
+    // bankDetails: {
+    //   bankName: { type: String, trim: true },
  
-      accountHolderName: { type: String, trim: true },
+    //   accountHolderName: { type: String, trim: true },
  
-      accountNumber: {
-        type: String,
-        trim: true,
-        minlength: 8,
-        maxlength: 20,
-      },
+    //   accountNumber: {
+    //     type: String,
+    //     trim: true,
+    //     minlength: 8,
+    //     maxlength: 20,
+    //   },
  
-      ifscCode: {
-        type: String,
-        trim: true,
-        uppercase: true,
-        match: /^[A-Z]{4}0[A-Z0-9]{6}$/
-      },
+    //   ifscCode: {
+    //     type: String,
+    //     trim: true,
+    //     uppercase: true,
+    //     match: /^[A-Z]{4}0[A-Z0-9]{6}$/
+    //   },
  
-      addedBankAccount: { type: Boolean, default: false }
-    },
+    //   addedBankAccount: { type: Boolean, default: false }
+    // },
+
+  bankDetails: {
+
+  bankName: {
+    type: String,
+    trim: true
+  },
+ 
+  accountHolderName: {
+    type: String,
+    trim: true
+  },
+ 
+  accountNumber: {
+    type: String,
+    trim: true,
+    minlength: 8,
+    maxlength: 20
+  },
+ 
+  ifscCode: {
+    type: String,
+    trim: true,
+    uppercase: true,
+    match: /^[A-Z]{4}0[A-Z0-9]{6}$/
+  },
+ 
+  // ✅ NEW: IFSC verification status
+  ifscVerificationStatus: {
+    type: String,
+    enum: ["PENDING", "VERIFIED", "FAILED"],
+    default: "PENDING"
+  },
+ 
+  // ✅ NEW: Bank account verification status
+  bankVerificationStatus: {
+    type: String,
+    enum: ["PENDING", "VERIFIED", "FAILED"],
+    default: "PENDING"
+  },
+ 
+  // existing flag
+  addedBankAccount: {
+    type: Boolean,
+    default: false
+  },
+ 
+  // optional but useful
+  verifiedAt: {
+    type: Date
+  }
+},
+ 
+
+
+
+
  
     wallet: {
       balance: { type: Number, default: 0 },
