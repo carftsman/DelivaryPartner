@@ -41,7 +41,7 @@ const {
  *             properties:
  *               phone:
  *                 type: string
- *                 example: "9876543210"
+ *                 example: "9988123456"
  *
  *     responses:
  *       200:
@@ -91,10 +91,10 @@ staticRouter.post("/send-static-otp", sendStaticMobileOtp);
  *             properties:
  *               phone:
  *                 type: string
- *                 example: "9876543210"
+ *                 example: "9988123456"
  *               otp:
  *                 type: string
- *                 example: "123456"
+ *                 example: "007007"
  *
  *     responses:
  *       200:

@@ -92,7 +92,7 @@ incentiveRouter.get("/peakhours-incentives", getHomeIncentives);
 
 * @swagger
 
-* /api/incentives/weekly-earning:
+* /api/home/incentives/weekly-earning:
 
 *   get:
 
@@ -220,7 +220,7 @@ incentiveRouter.get(
 
 /**
 * @swagger
-* /api/incentives/daily-earning:
+* /api/home/incentives/daily-earning:
 *   get:
 *     tags: [Incentives]
 *     summary: Get daily incentive earning
