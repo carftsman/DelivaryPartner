@@ -5,6 +5,77 @@ const SlotBooking = require("../models/SlotBookingModel");
 const Rider = require("../models/RiderModel");
 
 
+// exports.getWeeklySlots = async (req, res) => {
+//   try {
+//     let { city, zone, weekNumber, year } = req.query;
+
+//     if (!city) {
+//       return res.status(400).json({ success: false, message: "City is required" });
+//     }
+//     if (!zone) {
+//       return res.status(400).json({ success: false, message: "Zone is required" });
+//     }
+
+//     const today = new Date();
+
+//     if (!weekNumber) {
+//       weekNumber = getWeekNumber(today);
+//     }
+
+//     if (!year) {
+//       year = today.getFullYear();
+//     }
+
+//     // Fetch all days of this week
+//     const weekDocs = await Slot.find({
+//       city,
+//       zone,
+//       weekNumber: Number(weekNumber),
+//       year: Number(year)
+//     }).sort({ date: 1 });
+
+//     if (!weekDocs.length) {
+//       return res.json({
+//         success: true,
+//         message: "No slots found for this week",
+//         weekNumber,
+//         year,
+//         count: 0,
+//         data: []
+//       });
+//     }
+
+//     // Combine all active slots day-wise
+//     const result = weekDocs.map(day => {
+//       const activeSlots = day.slots
+//         ?.filter(s => s.status === "ACTIVE")
+//         ?.sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+//       return {
+//         date: day.date,
+//         weekNumber: day.weekNumber,
+//         year: day.year,
+//         city: day.city,
+//         zone: day.zone,
+//         slots: activeSlots
+//       };
+//     });
+
+//     return res.json({
+//       success: true,
+//       message: "Weekly slots fetched",
+//       weekNumber: Number(weekNumber),
+//       year: Number(year),
+//       count: result.length,
+//       data: result
+//     });
+
+//   } catch (err) {
+//     console.error("Get Weekly Slots Error:", err);
+//     res.status(500).json({ success: false, message: "Server error" });
+//   }
+// };
+
 exports.getWeeklySlots = async (req, res) => {
   try {
     let { city, zone, weekNumber, year } = req.query;
@@ -45,21 +116,46 @@ exports.getWeeklySlots = async (req, res) => {
       });
     }
 
-    // Combine all active slots day-wise
-    const result = weekDocs.map(day => {
-      const activeSlots = day.slots
-        ?.filter(s => s.status === "ACTIVE")
-        ?.sort((a, b) => a.startTime.localeCompare(b.startTime));
+    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-      return {
-        date: day.date,
-        weekNumber: day.weekNumber,
-        year: day.year,
-        city: day.city,
-        zone: day.zone,
-        slots: activeSlots
-      };
-    });
+    // Add date + dayName
+const result = weekDocs.map(day => {
+  // DEBUG
+//   console.log("DAY DOC:", day);
+
+  let currentDate = null;
+
+  if (day.date instanceof Date) {
+    currentDate = day.date;
+  } 
+  else if (typeof day.date === "string" && day.date.length >= 8) {
+    // Handle string "2025-12-01"
+    currentDate = new Date(`${day.date}T00:00:00`);
+  } 
+  else if (day._doc?.date) {
+    // Sometimes mongoose stores it in _doc
+    currentDate = new Date(`${day._doc.date}T00:00:00`);
+  }
+
+  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const dayName = currentDate ? dayNames[currentDate.getDay()] : "Invalid";
+
+  const activeSlots = day.slots
+    .filter(s => s.status === "ACTIVE")
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+  return {
+    date: day.date || day._doc?.date || null,
+    dayName,
+    weekNumber: day.weekNumber,
+    year: day.year,
+    city: day.city,
+    zone: day.zone,
+    slots: activeSlots
+  };
+});
+
+
 
     return res.json({
       success: true,
@@ -75,6 +171,9 @@ exports.getWeeklySlots = async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
+
+
+
 
 // exports.getDailySlotsWithStatus = async (req, res) => {
 //   try {
@@ -160,6 +259,9 @@ exports.getWeeklySlots = async (req, res) => {
 //     res.status(500).json({ success: false, message: "Server error" });
 //   }
 // };
+
+
+
 
 exports.getDailySlotsWithStatus = async (req, res) => {
   try {
@@ -796,6 +898,97 @@ exports.getCurrentSlot = async (req, res) => {
 
 
 
+// exports.getSlotHistory = async (req, res) => {
+//   try {
+//     const riderId = req.rider._id;
+//     let { weekNumber, year } = req.query;
+
+//     if (!weekNumber) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "weekNumber is required"
+//       });
+//     }
+
+//     const currentYear = new Date().getFullYear();
+//     year = year || currentYear;
+
+//     // Fetch all bookings for that week
+//     const bookings = await SlotBooking.find({
+//       riderId,
+//       weekNumber: Number(weekNumber),
+//       year: Number(year)
+//     }).sort({ date: 1, startTime: 1 });
+
+//     /* ------------------------------
+//         1. Weekly Summary Counts
+//     -------------------------------*/
+
+//     const summary = {
+//       totalSlots: bookings.length,
+//       completed: bookings.filter(b => b.status === "COMPLETED").length,
+//       cancelled: bookings.filter(b => b.status === "CANCELLED_BY_RIDER").length,
+//       noShow: bookings.filter(b => b.status === "NO_SHOW").length,
+//       failed: bookings.filter(b => b.status === "FAILED").length || 0 // if future logic
+//     };
+
+//     /* ------------------------------
+//         2. Group bookings by day
+//     -------------------------------*/
+
+//     const daysMap = {};
+
+//     bookings.forEach(b => {
+//       const dateKey = b.date; // "YYYY-MM-DD"
+
+//       if (!daysMap[dateKey]) {
+//         daysMap[dateKey] = {
+//           date: dateKey,
+//           totalSlots: 0,
+//           completed: 0,
+//           cancelled: 0,
+//           noShow: 0,
+//           failed: 0,
+//           slots: []
+//         };
+//       }
+
+//       daysMap[dateKey].slots.push(b);
+//       daysMap[dateKey].totalSlots++;
+
+//       if (b.status === "COMPLETED") daysMap[dateKey].completed++;
+//       if (b.status === "CANCELLED_BY_RIDER") daysMap[dateKey].cancelled++;
+//       if (b.status === "NO_SHOW") daysMap[dateKey].noShow++;
+//       if (b.status === "FAILED") daysMap[dateKey].failed++;
+//     });
+
+//     // Convert map to array sorted by date
+//     const dailyHistory = Object.values(daysMap).sort(
+//       (a, b) => new Date(a.date) - new Date(b.date)
+//     );
+
+//     /* ------------------------------
+//         3. Response
+//     -------------------------------*/
+
+//     return res.json({
+//       success: true,
+//       message: "Weekly slot history fetched",
+//       weekNumber: Number(weekNumber),
+//       year: Number(year),
+//       summary,
+//       days: dailyHistory
+//     });
+
+//   } catch (err) {
+//     console.error("Slot History Error:", err);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Server error"
+//     });
+//   }
+// };
+
 exports.getSlotHistory = async (req, res) => {
   try {
     const riderId = req.rider._id;
@@ -809,47 +1002,70 @@ exports.getSlotHistory = async (req, res) => {
     }
 
     const currentYear = new Date().getFullYear();
-    year = year || currentYear;
+    year = Number(year) || currentYear;
+    weekNumber = Number(weekNumber);
 
-    // Fetch all bookings for that week
+    /* ----------------------------------------------------
+       1. Fetch all bookings for the week
+    -----------------------------------------------------*/
     const bookings = await SlotBooking.find({
       riderId,
-      weekNumber: Number(weekNumber),
-      year: Number(year)
+      weekNumber,
+      year
     }).sort({ date: 1, startTime: 1 });
 
-    /* ------------------------------
-        1. Weekly Summary Counts
-    -------------------------------*/
-
+    /* ----------------------------------------------------
+       2. Weekly Summary
+    -----------------------------------------------------*/
     const summary = {
       totalSlots: bookings.length,
       completed: bookings.filter(b => b.status === "COMPLETED").length,
       cancelled: bookings.filter(b => b.status === "CANCELLED_BY_RIDER").length,
       noShow: bookings.filter(b => b.status === "NO_SHOW").length,
-      failed: bookings.filter(b => b.status === "FAILED").length || 0 // if future logic
+      failed: bookings.filter(b => b.status === "FAILED").length
     };
 
-    /* ------------------------------
-        2. Group bookings by day
-    -------------------------------*/
+    /* ----------------------------------------------------
+       3. Generate all 7 dates of selected week
+    -----------------------------------------------------*/
+    function getDateOfISOWeek(w, y) {
+      const simple = new Date(y, 0, 1 + (w - 1) * 7);
+      const dow = simple.getDay();
+      const ISOweekStart = simple;
+      if (dow <= 4)
+        ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
+      else
+        ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
+      return ISOweekStart;
+    }
 
+    const weekStart = getDateOfISOWeek(weekNumber, year);
+
+    const weekDates = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(weekStart);
+      d.setDate(d.getDate() + i);
+      weekDates.push(d.toISOString().slice(0, 10));
+    }
+
+    /* ----------------------------------------------------
+       4. Organize bookings by date
+    -----------------------------------------------------*/
     const daysMap = {};
+    weekDates.forEach(date => {
+      daysMap[date] = {
+        date,
+        totalSlots: 0,
+        completed: 0,
+        cancelled: 0,
+        noShow: 0,
+        failed: 0,
+        slots: []
+      };
+    });
 
     bookings.forEach(b => {
-      const dateKey = b.date; // "YYYY-MM-DD"
-
-      if (!daysMap[dateKey]) {
-        daysMap[dateKey] = {
-          date: dateKey,
-          totalSlots: 0,
-          completed: 0,
-          cancelled: 0,
-          noShow: 0,
-          failed: 0,
-          slots: []
-        };
-      }
+      const dateKey = b.date;
 
       daysMap[dateKey].slots.push(b);
       daysMap[dateKey].totalSlots++;
@@ -860,30 +1076,22 @@ exports.getSlotHistory = async (req, res) => {
       if (b.status === "FAILED") daysMap[dateKey].failed++;
     });
 
-    // Convert map to array sorted by date
-    const dailyHistory = Object.values(daysMap).sort(
-      (a, b) => new Date(a.date) - new Date(b.date)
-    );
-
-    /* ------------------------------
-        3. Response
-    -------------------------------*/
+    const dailyHistory = Object.values(daysMap);
 
     return res.json({
       success: true,
       message: "Weekly slot history fetched",
-      weekNumber: Number(weekNumber),
-      year: Number(year),
+      weekNumber,
+      year,
       summary,
       days: dailyHistory
     });
 
   } catch (err) {
     console.error("Slot History Error:", err);
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       message: "Server error"
     });
   }
 };
-
