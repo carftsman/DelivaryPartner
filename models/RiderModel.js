@@ -332,73 +332,64 @@ location: {
     // },
 
   bankDetails: {
+    bankName: {
+      type: String,
+      trim: true
+    },
 
-  bankName: {
-    type: String,
-    trim: true
-  },
- 
-  accountHolderName: {
-    type: String,
-    trim: true
-  },
+    accountHolderName: {
+      type: String,
+      trim: true
+    },
 
-  accountType:
-  {
-    type:String,
-    enum:["CURRENT","SAVINGS"]
+    accountType: {
+      type: String,
+      enum: ["CURRENT", "SAVINGS"]
+    },
+
+    branch: {
+      type: String,
+      trim: true
+    },
+
+    accountNumber: {
+      type: String,
+      trim: true,
+      minlength: 8,
+      maxlength: 20
+    },
+
+    ifscCode: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      match: /^[A-Z]{4}0[A-Z0-9]{6}$/
+    },
+
+    ifscVerificationStatus: {
+      type: String,
+      enum: ["PENDING", "VERIFIED", "FAILED"],
+      default: "PENDING"
+    },
+
+    bankVerificationStatus: {
+      type: String,
+      enum: ["PENDING", "VERIFIED", "FAILED"],
+      default: "PENDING"
+    },
+
+    addedBankAccount: {
+      type: Boolean,
+      default: false
+    },
+
+    verifiedAt: {
+      type: Date
+    }
   },
-  branch:
-  {
-    type:String,
-    
-  },
- 
-  accountNumber: {
-    type: String,
-    trim: true,
-    minlength: 8,
-    maxlength: 20
-  },
- 
-  ifscCode: {
-    type: String,
-    trim: true,
-    uppercase: true,
-    match: /^[A-Z]{4}0[A-Z0-9]{6}$/
-  },
- 
-  // ✅ NEW: IFSC verification status
-  ifscVerificationStatus: {
-    type: String,
-    enum: ["PENDING", "VERIFIED", "FAILED"],
-    default: "PENDING"
-  },
- 
-  // ✅ NEW: Bank account verification status
-  bankVerificationStatus: {
-    type: String,
-    enum: ["PENDING", "VERIFIED", "FAILED"],
-    default: "PENDING"
-  },
- 
-  // existing flag
-  addedBankAccount: {
-    type: Boolean,
-    default: false
-  },
- 
-  // optional but useful
-  verifiedAt: {
-    type: Date
-  }
-},
- 
 
 
 
-
- 
     wallet: {
       balance: { type: Number, default: 0 },
       totalEarned: { type: Number, default: 0 },

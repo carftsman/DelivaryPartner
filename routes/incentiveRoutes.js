@@ -29,15 +29,14 @@ const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
  * /api/home/peakhours-incentives:
  *   get:
  *     tags: [Incentives]
- *     summary: Get active incentives for home dashboard
+ *     summary: Get peak hour incentives for home dashboard
  *     description: |
- *       Fetches all ACTIVE incentives to be displayed on the rider home screen.
- *       This API is used for incentive banners, cards, and carousels.
+ *       Fetches ONLY ACTIVE **PEAK_HOUR** incentives.
+ *       Used to display peak-hour banners and highlights on the rider home screen.
  *
  *     responses:
- *
  *       200:
- *         description: Incentives fetched successfully
+ *         description: Peak hour incentives fetched successfully
  *         content:
  *           application/json:
  *             schema:
@@ -48,15 +47,12 @@ const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
  *                   example: true
  *                 count:
  *                   type: integer
- *                   example: 2
+ *                   example: 1
  *                 incentives:
  *                   type: array
  *                   items:
  *                     type: object
  *                     properties:
- *                       _id:
- *                         type: string
- *                         example: 65ab1234567890abcdef1234
  *                       title:
  *                         type: string
  *                         example: Peak Hour Bonus
@@ -65,7 +61,7 @@ const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
  *                         example: Complete 5 orders between 6PM - 10PM
  *                       incentiveType:
  *                         type: string
- *                         enum: [PEAK_HOUR, DAILY_EARNING, WEEKLY_EARNING]
+ *                         enum: [PEAK_HOUR]
  *                         example: PEAK_HOUR
  *                       rewardType:
  *                         type: string
@@ -77,19 +73,34 @@ const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
  *                       maxRewardPerRider:
  *                         type: number
  *                         example: 300
+ *                       condition:
+ *                         type: object
+ *                         properties:
+ *                           minOrders:
+ *                             type: integer
+ *                             example: 5
+ *                           startTime:
+ *                             type: string
+ *                             example: "18:00"
+ *                           endTime:
+ *                             type: string
+ *                             example: "22:00"
  *                       status:
  *                         type: string
- *                         enum: [ACTIVE, INACTIVE]
+ *                         enum: [ACTIVE]
  *                         example: ACTIVE
  *
  *       500:
- *         description: Server error while fetching incentives
+ *         description: Server error while fetching peak hour incentives
  */
- 
-incentiveRouter.get("/peakhours-incentives", getHomeIncentives);
 
+
+
+incentiveRouter.get(
+  "/peakhours-incentives",
+  getHomeIncentives
+);
 /**
-
 * @swagger
 
 * /api/home/incentives/weekly-earning:
