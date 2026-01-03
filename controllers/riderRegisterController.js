@@ -831,5 +831,55 @@ exports.initializeApp = async (req, res) => {
 };
 
 
+exports.toggleRiderStatus = async (req, res) => {
+  try {
+    const riderId = req.rider._id;
+    const { isOnline } = req.body;
+
+    if (typeof isOnline !== "boolean") {
+      return res.status(400).json({
+        success: false,
+        message: "isOnline must be true or false"
+      });
+    }
+
+    const updateData = {
+      "riderStatus.isOnline": isOnline,
+      "riderStatus.lastOnlineAt": new Date()
+    };
+
+    const rider = await Rider.findByIdAndUpdate(
+      riderId,
+      { $set: updateData },
+      { new: true }
+    );
+
+    if (!rider) {
+      return res.status(404).json({
+        success: false,
+        message: "Rider not found"
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: `Rider is now ${isOnline ? "ONLINE" : "OFFLINE"}`,
+      data: {
+        isOnline: rider.riderStatus.isOnline,
+        lastOnlineAt: rider.riderStatus.lastOnlineAt
+      }
+    });
+
+  } catch (err) {
+    console.error("Toggle Rider Status Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
+  }
+};
+
+
+
 
 

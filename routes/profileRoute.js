@@ -259,12 +259,13 @@ router.put("/update", riderAuthMiddleWare, updateProfile);
 
 router.get("/rider/profile", riderAuthMiddleWare, getProfile);
 // Get bank details
-/**
+
  /**
  * @swagger
  * /api/profile/bank-details:
  *   get:
- *     tags: [Profile]
+ *     tags:
+ *       - Profile
  *     summary: Get rider bank details
  *     description: Fetches saved bank account details along with IFSC and bank verification status for the authenticated rider.
  *     security:
@@ -290,12 +291,12 @@ router.get("/rider/profile", riderAuthMiddleWare, getProfile);
  *                         bankName:
  *                           type: string
  *                           example: HDFC Bank
- *                            accountType:
- *                            type: string
- *                            example: SAVINGS
- *                            branch:
- *                            type: string
- *                            example: miyapur
+ *                         accountType:
+ *                           type: string
+ *                           example: SAVINGS
+ *                         branch:
+ *                           type: string
+ *                           example: Miyapur
  *                         accountHolderName:
  *                           type: string
  *                           example: Jagadeesh Kumar
@@ -320,6 +321,8 @@ router.get("/rider/profile", riderAuthMiddleWare, getProfile);
  *       500:
  *         description: Server error
  */
+
+ 
 router.get("/bank-details", riderAuthMiddleWare, getBankDetails);
 
 // Get kit address

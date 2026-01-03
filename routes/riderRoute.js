@@ -18,6 +18,7 @@ const {
   refreshAccessToken,
   deviceToken,
   initializeApp,
+  toggleRiderStatus
 } = require("../controllers/riderRegisterController");
 
 const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
@@ -907,6 +908,55 @@ riderRouter.post("/rider/device-token", riderAuthMiddleWare ,deviceToken )
 
 
 riderRouter.get("/rider/initialize", riderAuthMiddleWare, initializeApp);
+
+
+  
+/**
+ * @swagger
+ * /api/rider/online-offline-status:
+ *   patch:
+ *     tags: [Rider]
+ *     summary: Toggle rider online/offline status
+ *     description: Update rider's online status and last online timestamp.
+ *     security:
+ *       - bearerAuth: []
+ *
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example:
+ *             isOnline: true
+ *
+ *     responses:
+ *       200:
+ *         description: Rider status updated successfully
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               message: "Rider is now ONLINE"
+ *               data:
+ *                 isOnline: true
+ *                 lastOnlineAt: "2026-01-03T10:25:00.000Z"
+ *
+ *       400:
+ *         description: Invalid request (missing isOnline)
+ *
+ *       404:
+ *         description: Rider not found
+ *
+ *       500:
+ *         description: Server error
+ */
+
+
+riderRouter.patch(
+  "/rider/online-offline-status",
+  riderAuthMiddleWare,
+  toggleRiderStatus
+);
+
 
 
 
