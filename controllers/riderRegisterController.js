@@ -831,5 +831,129 @@ exports.initializeApp = async (req, res) => {
 };
 
 
+exports.toggleRiderStatus = async (req, res) => {
+  try {
+    const riderId = req.rider._id;
+    const { isOnline } = req.body;
+
+    if (typeof isOnline !== "boolean") {
+      return res.status(400).json({
+        success: false,
+        message: "isOnline must be true or false"
+      });
+    }
+
+    // Fetch rider first
+    const rider = await Rider.findById(riderId);
+
+    if (!rider) {
+      return res.status(404).json({
+        success: false,
+        message: "Rider not found"
+      });
+    }
+
+    /* -----------------------------------------
+       GPS CONDITION:
+       Rider can go ONLINE only if gps.isEnabled = true
+    ------------------------------------------- */
+    if (isOnline && rider.gps?.isEnabled === false) {  //
+      return res.status(400).json({
+        success: false,
+        message: "Please enable GPS to go online"
+      });
+    }
+
+    // Update status
+    rider.riderStatus.isOnline = isOnline;
+    rider.riderStatus.lastOnlineAt = new Date();
+
+    await rider.save();
+
+    return res.json({
+      success: true,
+      message: `Rider is now ${isOnline ? "ONLINE" : "OFFLINE"}`,
+      data: {
+        isOnline: rider.riderStatus.isOnline,
+        lastOnlineAt: rider.riderStatus.lastOnlineAt
+      }
+    });
+
+  } catch (err) {
+    console.error("Toggle Rider Status Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
+  }
+};
 
 
+
+exports.updateGPS = async (req, res) => {
+  try {
+    const riderId = req.rider._id;
+    const { isEnabled, lat, lng } = req.body;
+
+    if (typeof isEnabled !== "boolean") {
+      return res.status(400).json({
+        success: false,
+        message: "isEnabled must be true or false"
+      });
+    }
+
+    // EDGE CASE: GPS DISABLED manually from phone settings
+    if (!isEnabled) {
+      await Rider.findByIdAndUpdate(riderId, {
+        $set: {
+          "gps.isEnabled": false,
+          "gps.lastLocation": null
+        }
+      });
+
+      return res.json({
+        success: true,
+        message: "GPS disabled",
+        data: {
+          isEnabled: false,
+          lastLocation: null
+        }
+      });
+    }
+
+    // If enabled → lat/lng REQUIRED
+    if (isEnabled && (!lat || !lng)) {
+      return res.status(400).json({
+        success: false,
+        message: "Latitude and longitude required when GPS is enabled"
+      });
+    }
+
+    await Rider.findByIdAndUpdate(riderId, {
+      $set: {
+        "gps.isEnabled": true,
+        "gps.lastLocation": {
+          lat,
+          lng,
+          updatedAt: new Date()
+        }
+      }
+    });
+
+    return res.json({
+      success: true,
+      message: "GPS updated successfully",
+      data: {
+        isEnabled: true,
+        location: { lat, lng }
+      }
+    });
+
+  } catch (err) {
+    console.error("GPS Update Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
+  }
+};

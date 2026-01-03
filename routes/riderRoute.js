@@ -18,6 +18,8 @@ const {
   refreshAccessToken,
   deviceToken,
   initializeApp,
+  toggleRiderStatus,
+  updateGPS
 } = require("../controllers/riderRegisterController");
 
 const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
@@ -907,6 +909,155 @@ riderRouter.post("/rider/device-token", riderAuthMiddleWare ,deviceToken )
 
 
 riderRouter.get("/rider/initialize", riderAuthMiddleWare, initializeApp);
+
+
+  
+/**
+ * @swagger
+ * /api/rider/online-offline-status:
+ *   patch:
+ *     tags:
+ *       - Rider
+ *     summary: Toggle rider online/offline status
+ *     description: >
+ *       Allows the rider to switch between ONLINE and OFFLINE.  
+ *       Rider **cannot go ONLINE if GPS is disabled** (`gps.isEnabled = false`).
+ *     security:
+ *       - bearerAuth: []
+ *
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               isOnline:
+ *                 type: boolean
+ *                 example: true
+ *                 description: true → Online, false → Offline
+ *
+ *     responses:
+ *       200:
+ *         description: Rider status updated successfully
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               message: "Rider is now ONLINE"
+ *               data:
+ *                 isOnline: true
+ *                 lastOnlineAt: "2026-01-03T10:20:00.000Z"
+ *
+ *       400:
+ *         description: Validation or GPS error
+ *         content:
+ *           application/json:
+ *             examples:
+ *               gpsDisabled:
+ *                 summary: GPS is OFF, rider cannot go online
+ *                 value:
+ *                   success: false
+ *                   message: "Please enable GPS to go online"
+ *               invalidBody:
+ *                 summary: Invalid request
+ *                 value:
+ *                   success: false
+ *                   message: "isOnline must be true or false"
+ *
+ *       401:
+ *         description: Unauthorized (Missing or invalid token)
+ *
+ *       404:
+ *         description: Rider not found
+ *
+ *       500:
+ *         description: Server error
+ */
+
+
+riderRouter.patch(
+  "/rider/online-offline-status",
+  riderAuthMiddleWare,
+  toggleRiderStatus
+);
+
+
+/**
+ * @swagger
+ * /api/rider/gps-status:
+ *   patch:
+ *     tags:
+ *       - GPS
+ *     summary: Update rider GPS permission & location
+ *     description: >
+ *       Updates the rider's GPS status.  
+ *       If GPS is disabled from phone settings, the app must send `isEnabled: false`.  
+ *       If GPS is enabled, latitude and longitude are required.
+ *     security:
+ *       - bearerAuth: []
+ *
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               isEnabled:
+ *                 type: boolean
+ *                 example: true
+ *               lat:
+ *                 type: number
+ *                 example: 12.9716
+ *               lng:
+ *                 type: number
+ *                 example: 77.5946
+ *
+ *     responses:
+ *       200:
+ *         description: GPS status updated
+ *         content:
+ *           application/json:
+ *             examples:
+ *               enabled:
+ *                 summary: GPS Enabled
+ *                 value:
+ *                   success: true
+ *                   message: "GPS updated successfully"
+ *                   data:
+ *                     isEnabled: true
+ *                     location:
+ *                       lat: 12.9716
+ *                       lng: 77.5946
+ *               disabled:
+ *                 summary: GPS Disabled
+ *                 value:
+ *                   success: true
+ *                   message: "GPS disabled"
+ *                   data:
+ *                     isEnabled: false
+ *                     lastLocation: null
+ *
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: false
+ *               message: "Latitude and longitude required when GPS is enabled"
+ *
+ *       500:
+ *         description: Server error
+ */
+
+
+riderRouter.patch(
+  "/rider/gps-status",
+  riderAuthMiddleWare,
+   updateGPS
+);
+
 
 
 

@@ -4,6 +4,7 @@ const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
 const {getProfile}=require('../controllers/profileController')
 const {getBankDetails}=require('../controllers/bankDetailsController')
 const {getKitAddress}=require('../controllers/kitAddressController')
+const uploadSelfie = require("../middleware/uploadSelfie");
 
 const { updateProfile,getAllDocuments,getWalletDetails,updateDocuments,getRiderOrderHistory } = require("../controllers/profileController");
 
@@ -115,7 +116,8 @@ const { updateProfile,getAllDocuments,getWalletDetails,updateDocuments,getRiderO
  *                   example: Server error
  */
 
-router.put("/update", riderAuthMiddleWare, updateProfile);
+router.put("/update", riderAuthMiddleWare,  uploadSelfie.single("selfie"),
+ updateProfile);
 
 
 /**
@@ -511,7 +513,7 @@ router.get("/wallet", riderAuthMiddleWare, getWalletDetails);
  *     tags:
  *       - Profile
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -567,35 +569,25 @@ router.put(
  * @swagger
  * /api/profile/orders/history:
  *   get:
- *     summary: Get rider order history
- *     description: |
- *       Fetch order history for the logged-in rider.
- *       Supports filtering by **all**, **daily**, **weekly**, and **monthly** orders.
- *       Also supports optional order status filtering.
+ *     summary: Get Rider Order History
+ *     description: >
+ *       Fetch delivered orders for the logged-in rider.
+ *       Supports daily, weekly, monthly, or all-time filters.
+ *       Returns totals (orders, earnings, distance, rating) and
+ *       detailed order data including items, pricing, and delivery address.
  *     tags:
  *       - Profile
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: filter
+ *         required: false
  *         schema:
  *           type: string
  *           enum: [all, daily, weekly, monthly]
  *           default: all
  *         description: Filter orders by time range
- *       - in: query
- *         name: status
- *         schema:
- *           type: string
- *           enum:
- *             - CREATED
- *             - CONFIRMED
- *             - ASSIGNED
- *             - PICKED_UP
- *             - DELIVERED
- *             - CANCELLED
- *         description: Filter orders by order status
  *     responses:
  *       200:
  *         description: Rider order history fetched successfully
@@ -609,74 +601,80 @@ router.put(
  *                   example: true
  *                 filter:
  *                   type: string
- *                   example: weekly
+ *                   example: monthly
  *                 totalOrders:
  *                   type: integer
- *                   example: 2
+ *                   example: 5
+ *                 totalEarnings:
+ *                   type: number
+ *                   example: 916
+ *                 totalDistance:
+ *                   type: number
+ *                   example: 42.7
+ *                 avgRating:
+ *                   type: number
+ *                   nullable: true
+ *                   example: 4.6
  *                 data:
  *                   type: array
  *                   items:
  *                     type: object
  *                     properties:
- *                       _id:
- *                         type: string
- *                         example: 694e57ce48bc25e14034aab3
  *                       orderId:
  *                         type: string
  *                         example: ORD-GURU-001
- *                       vendorShopName:
- *                         type: string
- *                         example: Daily Needs Store
- *                       orderStatus:
- *                         type: string
- *                         example: DELIVERED
+ *                       items:
+ *                         type: array
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             itemName:
+ *                               type: string
+ *                               example: Tomato
+ *                             quantity:
+ *                               type: integer
+ *                               example: 2
+ *                             price:
+ *                               type: number
+ *                               example: 40
+ *                             total:
+ *                               type: number
+ *                               example: 80
  *                       pricing:
  *                         type: object
  *                         properties:
  *                           itemTotal:
  *                             type: number
- *                             example: 650
+ *                             example: 60
  *                           deliveryFee:
  *                             type: number
- *                             example: 40
+ *                             example: 25
  *                           tax:
  *                             type: number
- *                             example: 10
+ *                             example: 5
  *                           platformCommission:
  *                             type: number
- *                             example: 20
+ *                             example: 5
  *                           totalAmount:
  *                             type: number
- *                             example: 700
- *                       riderEarning:
- *                         type: object
- *                         properties:
- *                           amount:
- *                             type: number
- *                             example: 80
- *                           credited:
- *                             type: boolean
- *                             example: true
- *                       payment:
- *                         type: object
- *                         properties:
- *                           mode:
- *                             type: string
- *                             example: ONLINE
- *                           status:
- *                             type: string
- *                             example: SUCCESS
- *                           transactionId:
- *                             type: string
- *                             example: TXN-GURU-001
- *                       createdAt:
+ *                             example: 95
+ *                       customerTip:
+ *                         type: number
+ *                         example: 10
+ *                       distanceTravelled:
+ *                         type: number
+ *                         example: 5.2
+ *                       rating:
+ *                         type: number
+ *                         nullable: true
+ *                         example: 5
+ *                       deliveredAddress:
  *                         type: string
- *                         format: date-time
- *                         example: 2025-02-27T10:30:00.000Z
+ *                         example: Kondapur
  *       400:
- *         description: Rider not found in request
+ *         description: Rider ID missing
  *       401:
- *         description: Unauthorized (invalid or missing token)
+ *         description: Unauthorized
  *       500:
  *         description: Server error
  */

@@ -3,6 +3,9 @@
 const Rider = require("../models/RiderModel");
 const Order = require("../models/OrderSchema");
 const mongoose=require('mongoose')
+const { extractTextFromImage } = require("../utils/ocr");
+const { extractPAN, extractDL } = require("../utils/kycParser");
+
 
 exports.getProfile = async (req, res) => {
   try {
@@ -109,32 +112,24 @@ exports.updateProfile = async (req, res) => {
   try {
     const riderId = req.rider._id;
 
-    const {
-      phone,
-      personalInfo,
-      location,
-      vehicleInfo,
-      selfie
-    } = req.body;
-
     const updateData = {};
 
-    if (phone?.countryCode || phone?.number) {
-      updateData.phone = {
-        countryCode: phone?.countryCode,
-        number: phone?.number
-      };
+    // ✅ SELFIE FROM FORM-DATA
+    if (req.file) {
+      updateData.selfie = `/uploads/selfies/${req.file.filename}`;
     }
 
-    if (personalInfo) updateData.personalInfo = personalInfo;
-    if (location) updateData.location = location;
-    if (vehicleInfo) updateData.vehicleInfo = vehicleInfo;
-    if (selfie) updateData.selfie = selfie;
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No data provided for update"
+      });
+    }
 
     const updatedRider = await Rider.findByIdAndUpdate(
       riderId,
       { $set: updateData },
-      { new: true, lean: true }
+      { new: true }
     );
 
     if (!updatedRider) {
@@ -146,14 +141,17 @@ exports.updateProfile = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Profile updated successfully"
+      message: "Selfie updated successfully",
+      data: {
+        selfie: updatedRider.selfie
+      }
     });
 
   } catch (err) {
-    console.error("Update Profile Error:", err);
+    console.error("Update Selfie Error:", err);
     return res.status(500).json({
       success: false,
-      message: "Server error"
+      message: err.message || "Server error"
     });
   }
 };
@@ -229,39 +227,108 @@ exports.getWalletDetails = async (req, res) => {
     });
   }
 };
+
 exports.updateDocuments = async (req, res) => {
   try {
-    const riderId = req.rider._id;
-    const kycData = req.body.kyc; // expecting kyc object
-
-    if (!kycData || typeof kycData !== "object") {
-      return res.status(400).json({
-        success: false,
-        message: "KYC data is required"
-      });
+    const riderId = req.rider?._id;
+    if (!riderId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
     const rider = await Rider.findById(riderId);
-
     if (!rider) {
-      return res.status(404).json({
+      return res.status(404).json({ success: false, message: "Rider not found" });
+    }
+
+    rider.kyc = rider.kyc || {};
+
+    const updatedDocs = [];
+
+    /* ================= PAN ================= */
+    if (req.files?.panImage?.[0]) {
+      const panImageUrl = await uploadToAzure(req.files.panImage[0], "pan");
+
+      const text = await extractTextFromImage(panImageUrl);
+      const panNumber = extractPAN(text);
+
+      if (!panNumber) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid PAN image"
+        });
+      }
+
+      rider.kyc.pan = {
+        number: panNumber,
+        image: panImageUrl,
+        status: "approved",
+        isVerified: true,
+        updatedAt: new Date()
+      };
+
+      updatedDocs.push("PAN");
+    }
+
+    /* ================= DRIVING LICENSE ================= */
+    if (req.files?.dlFrontImage?.[0]) {
+      const frontUrl = await uploadToAzure(req.files.dlFrontImage[0], "dl-front");
+      const backUrl = req.files?.dlBackImage?.[0]
+        ? await uploadToAzure(req.files.dlBackImage[0], "dl-back")
+        : rider.kyc.drivingLicense?.backImage;
+
+      const text = await extractTextFromImage(frontUrl);
+      const dlNumber = extractDL(text);
+
+      if (!dlNumber) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid Driving License image"
+        });
+      }
+
+      rider.kyc.drivingLicense = {
+        number: dlNumber,
+        frontImage: frontUrl,
+        backImage: backUrl,
+        status: "approved",
+        isVerified: true,
+        updatedAt: new Date()
+      };
+
+      updatedDocs.push("Driving License");
+    }
+
+    /* ================= NO FILE UPLOADED ================= */
+    if (updatedDocs.length === 0) {
+      return res.status(400).json({
         success: false,
-        message: "Rider not found"
+        message: "No documents uploaded"
       });
     }
 
-    // ✅ Merge existing KYC with new updates
-    rider.kyc = {
-      ...rider.kyc,
-      ...kycData
-    };
-
     await rider.save();
 
+    /* ================= RESPONSE ================= */
     return res.status(200).json({
       success: true,
-      message: "Documents updated successfully",
-      data: rider.kyc
+      message: `${updatedDocs.join(" & ")} updated successfully`,
+      data: {
+        ...(rider.kyc.pan && {
+          pan: {
+            number: rider.kyc.pan.number,
+            image: rider.kyc.pan.image,
+            status: rider.kyc.pan.status
+          }
+        }),
+        ...(rider.kyc.drivingLicense && {
+          drivingLicense: {
+            number: rider.kyc.drivingLicense.number,
+            frontImage: rider.kyc.drivingLicense.frontImage,
+            backImage: rider.kyc.drivingLicense.backImage,
+            status: rider.kyc.drivingLicense.status
+          }
+        })
+      }
     });
 
   } catch (err) {
@@ -278,82 +345,115 @@ exports.updateDocuments = async (req, res) => {
 
 
 
+
 exports.getRiderOrderHistory = async (req, res) => {
   try {
-    const riderId = req.rider?._id || req.user?._id;
+    const riderId = req.rider?._id;
+
     if (!riderId) {
-      return res.status(400).json({ success: false, message: "Rider missing" });
+      return res.status(400).json({
+        success: false,
+        message: "Rider ID missing"
+      });
     }
 
-    const riderObjectId = mongoose.Types.ObjectId.isValid(riderId)
-      ? new mongoose.Types.ObjectId(riderId)
-      : null;
-
-    const riderIdString = riderId.toString();
-    const { filter = "all", status } = req.query;
-
+    const { filter = "all" } = req.query;
     let dateFilter = {};
     const now = new Date();
 
-    // ✅ UTC-safe filters
+    // -------- DATE FILTERS --------
     if (filter === "daily") {
-      const start = new Date(Date.UTC(
-        now.getUTCFullYear(),
-        now.getUTCMonth(),
-        now.getUTCDate(), 0, 0, 0
-      ));
-      const end = new Date(Date.UTC(
-        now.getUTCFullYear(),
-        now.getUTCMonth(),
-        now.getUTCDate(), 23, 59, 59, 999
-      ));
-      dateFilter = { createdAt: { $gte: start, $lte: end } };
+      dateFilter.createdAt = {
+        $gte: new Date(now.setHours(0, 0, 0, 0)),
+        $lte: new Date(now.setHours(23, 59, 59, 999))
+      };
     }
 
     if (filter === "weekly") {
-      const end = new Date();
       const start = new Date();
-      start.setUTCDate(end.getUTCDate() - 6);
-      start.setUTCHours(0, 0, 0, 0);
-      dateFilter = { createdAt: { $gte: start, $lte: end } };
+      start.setDate(start.getDate() - 6);
+      start.setHours(0, 0, 0, 0);
+      dateFilter.createdAt = { $gte: start, $lte: new Date() };
     }
 
     if (filter === "monthly") {
-      const start = new Date(Date.UTC(
-        now.getUTCFullYear(),
-        now.getUTCMonth(), 1, 0, 0, 0
-      ));
-      const end = new Date(Date.UTC(
-        now.getUTCFullYear(),
-        now.getUTCMonth() + 1, 0, 23, 59, 59, 999
-      ));
-      dateFilter = { createdAt: { $gte: start, $lte: end } };
+      dateFilter.createdAt = {
+        $gte: new Date(now.getFullYear(), now.getMonth(), 1),
+        $lte: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+      };
     }
 
-    const query = {
-      riderId: {
-        $in: riderObjectId
-          ? [riderObjectId, riderIdString]
-          : [riderIdString]
-      },
+    const orders = await Order.find({
+      riderId,
+      orderStatus: "DELIVERED",
       ...dateFilter
-    };
+    }).sort({ createdAt: -1 });
 
-    if (status) query.orderStatus = status;
+    // -------- TOTALS --------
+    const totalOrders = orders.length;
 
-    const orders = await Order.find(query)
-      .select("orderId vendorShopName orderStatus pricing riderEarning payment createdAt")
-      .sort({ createdAt: -1 });
+    const totalEarnings = orders.reduce(
+      (sum, o) => sum + (o.pricing?.totalAmount || 0),
+      0
+    );
+
+    const totalDistance = orders.reduce(
+      (sum, o) => sum + (o.tracking?.distanceInKm || 0),
+      0
+    );
+
+    const ratings = orders
+      .map(o => o.rating)
+      .filter(r => typeof r === "number");
+
+    const avgRating =
+      ratings.length > 0
+        ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1)
+        : null;
+
+    // -------- RESPONSE DATA --------
+    const data = orders.map(order => ({
+      orderId: order.orderId,
+
+      items: order.items?.map(item => ({
+        itemName: item.itemName,
+        quantity: item.quantity,
+        price: item.price,
+        total: item.total
+      })) || [],
+
+      pricing: {
+        itemTotal: order.pricing?.itemTotal || 0,
+        deliveryFee: order.pricing?.deliveryFee || 0,
+        tax: order.pricing?.tax || 0,
+        platformCommission: order.pricing?.platformCommission || 0,
+        totalAmount: order.pricing?.totalAmount || 0
+      },
+
+      customerTip: order.payment?.tip || 0,
+
+      distanceTravelled: order.tracking?.distanceInKm || 0,
+
+      rating: order.rating || null,
+
+      deliveredAddress: order.deliveryAddress?.area || ""
+    }));
 
     return res.status(200).json({
       success: true,
       filter,
-      totalOrders: orders.length,
-      data: orders
+      totalOrders,
+      totalEarnings,
+      totalDistance,
+      avgRating,
+      data
     });
 
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ success: false, message: "Server error" });
+    console.error("Order History Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
   }
 };
