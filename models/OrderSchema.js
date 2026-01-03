@@ -115,5 +115,5 @@ const OrderSchema = new Schema(
 module.exports = mongoose.model(
   "Order",
   OrderSchema,
-  "order" // 👈 force exact collection name
+  "order" 
 );
