@@ -14,6 +14,7 @@ const adminRoutes = require("./routes/adminRoutes");
 const staticRouter = require("./routes/staticMobileOtpRoute");
 const profileRoutes = require("./routes/profileRoutes");
 const incentiveRoutes = require("./routes/incentiveRoutes");
+const insuranceRoutes = require("./routes/insuranceRoutes");
 
 
 // const offlineStoreRoute = require("./routes/offlineStoreRoute");
@@ -70,6 +71,8 @@ app.use("/api/slots", slotRouter);
 app.use('/api/profile',profileRoutes)
 
 app.use("/api/home", incentiveRoutes);
+app.use("/api/profile/insurance", insuranceRoutes);
+
 
 app.get("/", (req, res) => {
   res.send("Vega Delivery Partner API Running. Open /api-docs");

@@ -5,6 +5,7 @@ const Order = require("../models/OrderSchema");
 const mongoose=require('mongoose')
 const { extractTextFromImage } = require("../utils/ocr");
 const { extractPAN, extractDL } = require("../utils/kycParser");
+const { uploadToAzure } = require("../utils/azureUpload"); // path adjust
 
 
 exports.getProfile = async (req, res) => {
@@ -108,17 +109,30 @@ exports.getAllDocuments = async (req, res) => {
 };
 
 
+
 exports.updateProfile = async (req, res) => {
   try {
     const riderId = req.rider._id;
-
     const updateData = {};
 
-    // ✅ SELFIE FROM FORM-DATA
+    /* ---------------- DEBUG (KEEP TEMPORARILY) ---------------- */
+    // console.log("REQ BODY:", req.body);
+    // console.log("REQ FILE:", req.file);
+
+    /* ---------------- HANDLE TEXT FIELDS (SINGLE / MULTIPLE) ---------------- */
+    Object.keys(req.body).forEach(key => {
+      if (req.body[key] !== undefined && req.body[key] !== "") {
+        updateData[key] = req.body[key];
+      }
+    });
+
+    /* ---------------- HANDLE SELFIE (AZURE) ---------------- */
     if (req.file) {
-      updateData.selfie = `/uploads/selfies/${req.file.filename}`;
+      const selfieUrl = await uploadToAzure(req.file, "selfies");
+      updateData.selfie = selfieUrl;
     }
 
+    /* ---------------- VALIDATION ---------------- */
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({
         success: false,
@@ -126,6 +140,7 @@ exports.updateProfile = async (req, res) => {
       });
     }
 
+    /* ---------------- UPDATE ---------------- */
     const updatedRider = await Rider.findByIdAndUpdate(
       riderId,
       { $set: updateData },
@@ -141,17 +156,15 @@ exports.updateProfile = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Selfie updated successfully",
-      data: {
-        selfie: updatedRider.selfie
-      }
+      message: "Profile updated successfully",
+      data: updateData
     });
 
   } catch (err) {
-    console.error("Update Selfie Error:", err);
+    console.error("Update Profile Error:", err);
     return res.status(500).json({
       success: false,
-      message: err.message || "Server error"
+      message: "Server error"
     });
   }
 };
@@ -359,37 +372,41 @@ exports.getRiderOrderHistory = async (req, res) => {
 
     const { filter = "all" } = req.query;
     let dateFilter = {};
-    const now = new Date();
 
-    // -------- DATE FILTERS --------
+    // ---------- DATE FILTERS ----------
     if (filter === "daily") {
-      dateFilter.createdAt = {
-        $gte: new Date(now.setHours(0, 0, 0, 0)),
-        $lte: new Date(now.setHours(23, 59, 59, 999))
-      };
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+
+      const end = new Date();
+      end.setHours(23, 59, 59, 999);
+
+      dateFilter.createdAt = { $gte: start, $lte: end };
     }
 
     if (filter === "weekly") {
       const start = new Date();
       start.setDate(start.getDate() - 6);
       start.setHours(0, 0, 0, 0);
+
       dateFilter.createdAt = { $gte: start, $lte: new Date() };
     }
 
     if (filter === "monthly") {
-      dateFilter.createdAt = {
-        $gte: new Date(now.getFullYear(), now.getMonth(), 1),
-        $lte: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
-      };
+      const start = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      const end = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0, 23, 59, 59);
+
+      dateFilter.createdAt = { $gte: start, $lte: end };
     }
 
+    // ---------- FETCH ORDERS ----------
     const orders = await Order.find({
       riderId,
       orderStatus: "DELIVERED",
       ...dateFilter
     }).sort({ createdAt: -1 });
 
-    // -------- TOTALS --------
+    // ---------- TOTALS ----------
     const totalOrders = orders.length;
 
     const totalEarnings = orders.reduce(
@@ -407,19 +424,19 @@ exports.getRiderOrderHistory = async (req, res) => {
       .filter(r => typeof r === "number");
 
     const avgRating =
-      ratings.length > 0
+      ratings.length
         ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1)
         : null;
 
-    // -------- RESPONSE DATA --------
+    // ---------- RESPONSE ----------
     const data = orders.map(order => ({
       orderId: order.orderId,
 
       items: order.items?.map(item => ({
-        itemName: item.itemName,
+        itemName: item.name,
         quantity: item.quantity,
         price: item.price,
-        total: item.total
+        total: item.price * item.quantity
       })) || [],
 
       pricing: {
@@ -434,9 +451,11 @@ exports.getRiderOrderHistory = async (req, res) => {
 
       distanceTravelled: order.tracking?.distanceInKm || 0,
 
+      durationInMin: order.tracking?.durationInMin || 0,
+
       rating: order.rating || null,
 
-      deliveredAddress: order.deliveryAddress?.area || ""
+deliveredAddress: order.deliveryAddress?.addressLine || ""
     }));
 
     return res.status(200).json({
