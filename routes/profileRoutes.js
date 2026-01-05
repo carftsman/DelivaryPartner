@@ -7,7 +7,7 @@ const {getKitAddress}=require('../controllers/kitAddressController')
 const uploadSelfie = require("../middleware/uploadSelfie");
 const { upload } = require("../utils/azureUpload");
 
-const { updateProfile,getAllDocuments,getWalletDetails,updateDocuments,getRiderOrderHistory } = require("../controllers/profileController");
+const { updateProfile,getAllDocuments,getWalletDetails,updateDocuments,getRiderOrderHistory,getSlotHistory } = require("../controllers/profileController");
 
 /**
  * @swagger
@@ -664,6 +664,119 @@ router.get(
   "/orders/history",
   riderAuthMiddleWare,
   getRiderOrderHistory
+);
+/**
+ * @swagger
+ * /api/profile/slots/history:
+ *   get:
+ *     tags:
+ *       - Profile
+ *     summary: Get rider slot history
+ *     description: >
+ *       Fetches slot history for the authenticated rider with earnings and order statistics.
+ *       Supports daily, weekly, and monthly filters.
+ *       Orders are calculated day-wise for each slot.
+ *     security:
+ *       - bearerAuth: []
+ *
+ *     parameters:
+ *       - in: query
+ *         name: filter
+ *         schema:
+ *           type: string
+ *           enum: [daily, weekly, monthly]
+ *         required: false
+ *         description: Filter type for slot history
+ *
+ *       - in: query
+ *         name: date
+ *         schema:
+ *           type: string
+ *           example: "2026-01-05"
+ *         required: false
+ *         description: Specific date for daily filter (YYYY-MM-DD)
+ *
+ *       - in: query
+ *         name: month
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *         required: false
+ *         description: Month number for monthly filter (1-12)
+ *
+ *       - in: query
+ *         name: year
+ *         schema:
+ *           type: integer
+ *           example: 2026
+ *         required: false
+ *         description: Year for monthly filter
+ *
+ *     responses:
+ *       200:
+ *         description: Slot history fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 filter:
+ *                   type: string
+ *                   example: daily
+ *                 totalSlots:
+ *                   type: integer
+ *                   example: 1
+ *                 totalEarnings:
+ *                   type: number
+ *                   example: 60
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       slotBookingId:
+ *                         type: string
+ *                         example: "695b541094c6d3aa76cada71"
+ *                       date:
+ *                         type: string
+ *                         example: "2026-01-05"
+ *                       startTime:
+ *                         type: string
+ *                         example: "18:00"
+ *                       endTime:
+ *                         type: string
+ *                         example: "20:00"
+ *                       slotStatus:
+ *                         type: string
+ *                         enum: [ACTIVE, COMPLETED, CANCELED]
+ *                         example: COMPLETED
+ *                       totalOrders:
+ *                         type: integer
+ *                         example: 1
+ *                       completedOrders:
+ *                         type: integer
+ *                         example: 1
+ *                       canceledOrders:
+ *                         type: integer
+ *                         example: 0
+ *                       slotEarnings:
+ *                         type: number
+ *                         example: 60
+ *
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *
+ *       500:
+ *         description: Internal server error
+ */
+
+router.get(
+  "/slots/history",
+  riderAuthMiddleWare,
+  getSlotHistory
 );
 
 module.exports=router;

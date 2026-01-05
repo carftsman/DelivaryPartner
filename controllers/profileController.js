@@ -6,7 +6,7 @@ const mongoose=require('mongoose')
 const { extractTextFromImage } = require("../utils/ocr");
 const { extractPAN, extractDL } = require("../utils/kycParser");
 const { uploadToAzure } = require("../utils/azureUpload"); // path adjust
-
+const SlotBooking = require("../models/SlotBookingModel");
 
 exports.getProfile = async (req, res) => {
   try {
@@ -352,7 +352,155 @@ exports.updateDocuments = async (req, res) => {
     });
   }
 };
+// helper (make sure this exists)
+const normalizeDate = (inputDate) => {
+  if (!inputDate) return null;
+  const d = new Date(inputDate);
+  if (isNaN(d)) return null;
+  return d.toISOString().slice(0, 10);
+};
 
+exports.getSlotHistory = async (req, res) => {
+  try {
+    const riderId = req.rider._id;
+    const { filter, date, month, year } = req.query;
+
+    let dateFilter = {};
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    /* ---------------- DATE FILTER ---------------- */
+
+    if (filter === "daily") {
+      dateFilter.date = normalizeDate(date) || todayStr;
+    }
+
+    else if (filter === "weekly") {
+      const today = new Date();
+      const day = today.getDay() || 7;
+      const start = new Date(today);
+      start.setDate(today.getDate() - day + 1);
+
+      const weekDates = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(start);
+        d.setDate(start.getDate() + i);
+        weekDates.push(d.toISOString().slice(0, 10));
+      }
+
+      dateFilter.date = { $in: weekDates };
+    }
+
+    else if (filter === "monthly") {
+      const y = Number(year) || new Date().getFullYear();
+      const m = Number(month) || new Date().getMonth() + 1;
+      const days = new Date(y, m, 0).getDate();
+
+      const monthDates = [];
+      for (let i = 1; i <= days; i++) {
+        monthDates.push(
+          `${y}-${String(m).padStart(2, "0")}-${String(i).padStart(2, "0")}`
+        );
+      }
+
+      dateFilter.date = { $in: monthDates };
+    }
+
+    /* ---------------- FETCH SLOT BOOKINGS ---------------- */
+
+    const bookings = await SlotBooking.find({
+      riderId,
+      ...dateFilter
+    }).lean();
+
+    if (!bookings.length) {
+      return res.json({
+        success: true,
+        filter: filter || "all",
+        totalSlots: 0,
+        totalEarnings: 0,
+        data: []
+      });
+    }
+
+    /* ---------------- SLOT + ORDER MAPPING ---------------- */
+
+    let totalEarnings = 0;
+    const data = [];
+
+    for (const booking of bookings) {
+
+      // ✅ DAY-WISE ORDER MATCHING (FIX)
+      const dayStart = new Date(booking.date);
+      dayStart.setHours(0, 0, 0, 0);
+
+      const dayEnd = new Date(booking.date);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      const orders = await Order.find({
+        riderId,
+        createdAt: { $gte: dayStart, $lte: dayEnd }
+      }).lean();
+
+      // ✅ correct status fields
+      const completed = orders.filter(
+        o => o.orderStatus?.toUpperCase() === "DELIVERED"
+      );
+
+      const canceled = orders.filter(
+        o => o.orderStatus?.toUpperCase() === "CANCELED"
+      );
+
+      // ✅ correct earnings field
+      const slotEarnings = completed.reduce(
+        (sum, o) => sum + Number(o.riderEarning?.total || 0),
+        0
+      );
+
+      totalEarnings += slotEarnings;
+
+// determine slot status safely
+let slotStatus = "ACTIVE";
+
+if (booking.status === "CANCELED") {
+  slotStatus = "CANCELED";
+} else {
+  const slotEnd = new Date(`${booking.date}T${booking.endTime}:00`);
+  const now = new Date();
+
+  if (slotEnd < now) {
+    slotStatus = "COMPLETED";
+  }
+}
+
+      data.push({
+        slotBookingId: booking._id,
+        date: booking.date,
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+        slotStatus,
+        totalOrders: orders.length,
+        completedOrders: completed.length,
+        canceledOrders: canceled.length,
+        slotEarnings
+      });
+    }
+
+    return res.json({
+      success: true,
+      filter: filter || "all",
+      totalSlots: data.length,
+      totalEarnings,
+      data
+    });
+
+  } catch (err) {
+    console.error("Slot History Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+};
 
 
 
