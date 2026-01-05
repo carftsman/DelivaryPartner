@@ -5,7 +5,8 @@ const Order = require("../models/OrderSchema");
 const mongoose=require('mongoose')
 const { extractTextFromImage } = require("../utils/ocr");
 const { extractPAN, extractDL } = require("../utils/kycParser");
-
+const { uploadToAzure } = require("../utils/azureUpload"); // path adjust
+const SlotBooking = require("../models/SlotBookingModel");
 
 exports.getProfile = async (req, res) => {
   try {
@@ -108,17 +109,30 @@ exports.getAllDocuments = async (req, res) => {
 };
 
 
+
 exports.updateProfile = async (req, res) => {
   try {
     const riderId = req.rider._id;
-
     const updateData = {};
 
-    // ✅ SELFIE FROM FORM-DATA
+    /* ---------------- DEBUG (KEEP TEMPORARILY) ---------------- */
+    // console.log("REQ BODY:", req.body);
+    // console.log("REQ FILE:", req.file);
+
+    /* ---------------- HANDLE TEXT FIELDS (SINGLE / MULTIPLE) ---------------- */
+    Object.keys(req.body).forEach(key => {
+      if (req.body[key] !== undefined && req.body[key] !== "") {
+        updateData[key] = req.body[key];
+      }
+    });
+
+    /* ---------------- HANDLE SELFIE (AZURE) ---------------- */
     if (req.file) {
-      updateData.selfie = `/uploads/selfies/${req.file.filename}`;
+      const selfieUrl = await uploadToAzure(req.file, "selfies");
+      updateData.selfie = selfieUrl;
     }
 
+    /* ---------------- VALIDATION ---------------- */
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({
         success: false,
@@ -126,6 +140,7 @@ exports.updateProfile = async (req, res) => {
       });
     }
 
+    /* ---------------- UPDATE ---------------- */
     const updatedRider = await Rider.findByIdAndUpdate(
       riderId,
       { $set: updateData },
@@ -141,17 +156,15 @@ exports.updateProfile = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Selfie updated successfully",
-      data: {
-        selfie: updatedRider.selfie
-      }
+      message: "Profile updated successfully",
+      data: updateData
     });
 
   } catch (err) {
-    console.error("Update Selfie Error:", err);
+    console.error("Update Profile Error:", err);
     return res.status(500).json({
       success: false,
-      message: err.message || "Server error"
+      message: "Server error"
     });
   }
 };
@@ -339,7 +352,155 @@ exports.updateDocuments = async (req, res) => {
     });
   }
 };
+// helper (make sure this exists)
+const normalizeDate = (inputDate) => {
+  if (!inputDate) return null;
+  const d = new Date(inputDate);
+  if (isNaN(d)) return null;
+  return d.toISOString().slice(0, 10);
+};
 
+exports.getSlotHistory = async (req, res) => {
+  try {
+    const riderId = req.rider._id;
+    const { filter, date, month, year } = req.query;
+
+    let dateFilter = {};
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    /* ---------------- DATE FILTER ---------------- */
+
+    if (filter === "daily") {
+      dateFilter.date = normalizeDate(date) || todayStr;
+    }
+
+    else if (filter === "weekly") {
+      const today = new Date();
+      const day = today.getDay() || 7;
+      const start = new Date(today);
+      start.setDate(today.getDate() - day + 1);
+
+      const weekDates = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(start);
+        d.setDate(start.getDate() + i);
+        weekDates.push(d.toISOString().slice(0, 10));
+      }
+
+      dateFilter.date = { $in: weekDates };
+    }
+
+    else if (filter === "monthly") {
+      const y = Number(year) || new Date().getFullYear();
+      const m = Number(month) || new Date().getMonth() + 1;
+      const days = new Date(y, m, 0).getDate();
+
+      const monthDates = [];
+      for (let i = 1; i <= days; i++) {
+        monthDates.push(
+          `${y}-${String(m).padStart(2, "0")}-${String(i).padStart(2, "0")}`
+        );
+      }
+
+      dateFilter.date = { $in: monthDates };
+    }
+
+    /* ---------------- FETCH SLOT BOOKINGS ---------------- */
+
+    const bookings = await SlotBooking.find({
+      riderId,
+      ...dateFilter
+    }).lean();
+
+    if (!bookings.length) {
+      return res.json({
+        success: true,
+        filter: filter || "all",
+        totalSlots: 0,
+        totalEarnings: 0,
+        data: []
+      });
+    }
+
+    /* ---------------- SLOT + ORDER MAPPING ---------------- */
+
+    let totalEarnings = 0;
+    const data = [];
+
+    for (const booking of bookings) {
+
+      // ✅ DAY-WISE ORDER MATCHING (FIX)
+      const dayStart = new Date(booking.date);
+      dayStart.setHours(0, 0, 0, 0);
+
+      const dayEnd = new Date(booking.date);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      const orders = await Order.find({
+        riderId,
+        createdAt: { $gte: dayStart, $lte: dayEnd }
+      }).lean();
+
+      // ✅ correct status fields
+      const completed = orders.filter(
+        o => o.orderStatus?.toUpperCase() === "DELIVERED"
+      );
+
+      const canceled = orders.filter(
+        o => o.orderStatus?.toUpperCase() === "CANCELED"
+      );
+
+      // ✅ correct earnings field
+      const slotEarnings = completed.reduce(
+        (sum, o) => sum + Number(o.riderEarning?.total || 0),
+        0
+      );
+
+      totalEarnings += slotEarnings;
+
+// determine slot status safely
+let slotStatus = "ACTIVE";
+
+if (booking.status === "CANCELED") {
+  slotStatus = "CANCELED";
+} else {
+  const slotEnd = new Date(`${booking.date}T${booking.endTime}:00`);
+  const now = new Date();
+
+  if (slotEnd < now) {
+    slotStatus = "COMPLETED";
+  }
+}
+
+      data.push({
+        slotBookingId: booking._id,
+        date: booking.date,
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+        slotStatus,
+        totalOrders: orders.length,
+        completedOrders: completed.length,
+        canceledOrders: canceled.length,
+        slotEarnings
+      });
+    }
+
+    return res.json({
+      success: true,
+      filter: filter || "all",
+      totalSlots: data.length,
+      totalEarnings,
+      data
+    });
+
+  } catch (err) {
+    console.error("Slot History Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+};
 
 
 
@@ -359,37 +520,41 @@ exports.getRiderOrderHistory = async (req, res) => {
 
     const { filter = "all" } = req.query;
     let dateFilter = {};
-    const now = new Date();
 
-    // -------- DATE FILTERS --------
+    // ---------- DATE FILTERS ----------
     if (filter === "daily") {
-      dateFilter.createdAt = {
-        $gte: new Date(now.setHours(0, 0, 0, 0)),
-        $lte: new Date(now.setHours(23, 59, 59, 999))
-      };
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+
+      const end = new Date();
+      end.setHours(23, 59, 59, 999);
+
+      dateFilter.createdAt = { $gte: start, $lte: end };
     }
 
     if (filter === "weekly") {
       const start = new Date();
       start.setDate(start.getDate() - 6);
       start.setHours(0, 0, 0, 0);
+
       dateFilter.createdAt = { $gte: start, $lte: new Date() };
     }
 
     if (filter === "monthly") {
-      dateFilter.createdAt = {
-        $gte: new Date(now.getFullYear(), now.getMonth(), 1),
-        $lte: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
-      };
+      const start = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      const end = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0, 23, 59, 59);
+
+      dateFilter.createdAt = { $gte: start, $lte: end };
     }
 
+    // ---------- FETCH ORDERS ----------
     const orders = await Order.find({
       riderId,
       orderStatus: "DELIVERED",
       ...dateFilter
     }).sort({ createdAt: -1 });
 
-    // -------- TOTALS --------
+    // ---------- TOTALS ----------
     const totalOrders = orders.length;
 
     const totalEarnings = orders.reduce(
@@ -407,19 +572,19 @@ exports.getRiderOrderHistory = async (req, res) => {
       .filter(r => typeof r === "number");
 
     const avgRating =
-      ratings.length > 0
+      ratings.length
         ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1)
         : null;
 
-    // -------- RESPONSE DATA --------
+    // ---------- RESPONSE ----------
     const data = orders.map(order => ({
       orderId: order.orderId,
 
       items: order.items?.map(item => ({
-        itemName: item.itemName,
+        itemName: item.name,
         quantity: item.quantity,
         price: item.price,
-        total: item.total
+        total: item.price * item.quantity
       })) || [],
 
       pricing: {
@@ -434,9 +599,11 @@ exports.getRiderOrderHistory = async (req, res) => {
 
       distanceTravelled: order.tracking?.distanceInKm || 0,
 
+      durationInMin: order.tracking?.durationInMin || 0,
+
       rating: order.rating || null,
 
-      deliveredAddress: order.deliveryAddress?.area || ""
+deliveredAddress: order.deliveryAddress?.addressLine || ""
     }));
 
     return res.status(200).json({

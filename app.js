@@ -20,6 +20,7 @@ const earningsRoutes = require("./routes/earningsRoutes");
 
 
 
+const insuranceRoutes = require("./routes/insuranceRoutes");
 
 
 // const offlineStoreRoute = require("./routes/offlineStoreRoute");
@@ -78,6 +79,8 @@ app.use('/api/profile',profileRoutes)
 app.use("/api/home", incentiveRoutes);
 // app.use("/api/earnings", earningsRoutes);
 app.use("/api/rider/earnings", earningsRoutes);
+app.use("/api/profile/insurance", insuranceRoutes);
+
 
 app.get("/", (req, res) => {
   res.send("Vega Delivery Partner API Running. Open /api-docs");

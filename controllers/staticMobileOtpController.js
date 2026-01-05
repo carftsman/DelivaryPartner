@@ -176,68 +176,212 @@ exports.sendStaticMobileOtp = async (req, res) => {
 // =========================
 // VERIFY STATIC OTP (UPDATED)
 // =========================
+// exports.verifyStaticMobileOtp = async (req, res) => {
+//   try {
+//     let { phone, otp } = req.body;
+
+//     if (!phone || !otp) {
+//       return res.status(400).json({ success: false, message: "Phone & OTP required" });
+//     }
+
+//     if (!phone.startsWith("+") && phone.length === 10) {
+//       phone = `+91${phone}`;
+//     }
+
+//     const rider = await Rider.findOne({
+//       "phone.number": phone.replace("+91", ""),
+//     });
+
+//     if (!rider) {
+//       return res.status(404).json({ success: false, message: "Rider not found" });
+//     }
+
+//     if (otp !== STATIC_OTP) {
+//       return res.status(400).json({ success: false, message: "Incorrect OTP" });
+//     }
+
+//     rider.phone.isVerified = true;
+//     rider.onboardingProgress.phoneVerified = true;
+
+//     if (rider.onboardingStage === "PHONE_VERIFICATION") {
+//       rider.onboardingStage = "APP_PERMISSIONS";
+//     }
+
+//     // ACCESS TOKEN (SHORT LIVED)
+//     const accessToken = jwt.sign(
+//       { riderId: rider._id, type: "access" },
+//       process.env.JWT_ACCESS_SECRET,
+//     //   { expiresIn: "15m" }
+//     );
+
+//     // REFRESH TOKEN (LONG LIVED)
+//     const refreshToken = jwt.sign(
+//       { riderId: rider._id, type: "refresh" },
+//       process.env.JWT_REFRESH_SECRET,
+//       { expiresIn: "30d" }
+//     );
+
+//     rider.refreshToken = refreshToken;
+//     rider.otp = undefined;
+
+//     await rider.save();
+
+//     res.json({
+//       success: true,
+//       message: "Static OTP verified",
+//       nextStage: rider.onboardingStage,
+//       accessToken,
+//       refreshToken,
+//     });
+//   } catch (err) {
+//     console.error("Static OTP Verify Error:", err);
+//     res.status(500).json({ success: false, message: "Server error" });
+//   }
+// };
+
 exports.verifyStaticMobileOtp = async (req, res) => {
+
   try {
+
     let { phone, otp } = req.body;
-
+ 
     if (!phone || !otp) {
-      return res.status(400).json({ success: false, message: "Phone & OTP required" });
-    }
 
-    if (!phone.startsWith("+") && phone.length === 10) {
-      phone = `+91${phone}`;
-    }
+      return res.status(400).json({
 
+        success: false,
+
+        message: "Phone & OTP required",
+
+      });
+
+    }
+ 
+    //NORMALIZE PHONE INSIDE API
+
+    // Always store & search only 10-digit number
+
+    if (phone.startsWith("+91")) {
+
+      phone = phone.slice(3);
+
+    }
+ 
+    if (phone.length !== 10) {
+
+      return res.status(400).json({
+
+        success: false,
+
+        message: "Invalid phone number format",
+
+      });
+
+    }
+ 
     const rider = await Rider.findOne({
-      "phone.number": phone.replace("+91", ""),
+
+      "phone.number": phone,
+
     });
-
+ 
     if (!rider) {
-      return res.status(404).json({ success: false, message: "Rider not found" });
-    }
 
-    if (otp !== STATIC_OTP) {
-      return res.status(400).json({ success: false, message: "Incorrect OTP" });
+      return res.status(404).json({
+
+        success: false,
+
+        message: "Rider not found",
+
+      });
+
     }
+ 
+    if (otp !== STATIC_OTP) {
+
+      return res.status(400).json({
+
+        success: false,
+
+        message: "Incorrect OTP",
+
+      });
+
+    }
+ 
+    //Mark phone verified
 
     rider.phone.isVerified = true;
+
     rider.onboardingProgress.phoneVerified = true;
-
+ 
     if (rider.onboardingStage === "PHONE_VERIFICATION") {
+
       rider.onboardingStage = "APP_PERMISSIONS";
+
     }
+ 
+    // ACCESS TOKEN
 
-    // ACCESS TOKEN (SHORT LIVED)
     const accessToken = jwt.sign(
+
       { riderId: rider._id, type: "access" },
+
       process.env.JWT_ACCESS_SECRET,
-    //   { expiresIn: "15m" }
-    );
 
-    // REFRESH TOKEN (LONG LIVED)
+      { expiresIn: "15m" }
+
+    );
+ 
+    // REFRESH TOKEN
+
     const refreshToken = jwt.sign(
+
       { riderId: rider._id, type: "refresh" },
+
       process.env.JWT_REFRESH_SECRET,
+
       { expiresIn: "30d" }
+
     );
-
+ 
     rider.refreshToken = refreshToken;
+
     rider.otp = undefined;
-
+ 
     await rider.save();
+ 
+    return res.json({
 
-    res.json({
       success: true,
-      message: "Static OTP verified",
+
+      message: "OTP verified successfully",
+
       nextStage: rider.onboardingStage,
+
       accessToken,
+
       refreshToken,
+
     });
+
   } catch (err) {
-    console.error("Static OTP Verify Error:", err);
-    res.status(500).json({ success: false, message: "Server error" });
+
+    console.error("Verify OTP Error:", err);
+
+    return res.status(500).json({
+
+      success: false,
+
+      message: "Server error",
+
+    });
+
   }
+
 };
+
+ 
 
 // =========================
 // REFRESH ACCESS TOKEN (NEW)

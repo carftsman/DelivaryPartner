@@ -5,8 +5,9 @@ const {getProfile}=require('../controllers/profileController')
 const {getBankDetails}=require('../controllers/bankDetailsController')
 const {getKitAddress}=require('../controllers/kitAddressController')
 const uploadSelfie = require("../middleware/uploadSelfie");
+const { upload } = require("../utils/azureUpload");
 
-const { updateProfile,getAllDocuments,getWalletDetails,updateDocuments,getRiderOrderHistory } = require("../controllers/profileController");
+const { updateProfile,getAllDocuments,getWalletDetails,updateDocuments,getRiderOrderHistory,getSlotHistory } = require("../controllers/profileController");
 
 /**
  * @swagger
@@ -14,66 +15,48 @@ const { updateProfile,getAllDocuments,getWalletDetails,updateDocuments,getRiderO
  *   put:
  *     tags:
  *       - Profile
- *     summary: Update rider profile
+ *     summary: Update rider profile (single field or selfie)
  *     description: >
- *       Update allowed rider profile fields for the logged-in rider.
- *       Only basic profile information can be updated such as phone,
- *       personal information, location, vehicle details, and selfie.
- *       Sensitive fields like wallet, bank details, KYC documents,
- *       permissions, and system flags cannot be updated through this API.
+ *       Updates rider profile details.  
+ *       Supports updating **any single text field**, multiple fields, or **selfie upload**.
+ *       Selfie is uploaded to Azure Blob Storage and the URL is saved.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
- *       required: true
+ *       required: false
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             properties:
- *               phone:
- *                 type: object
- *                 properties:
- *                   countryCode:
- *                     type: string
- *                     example: "+91"
- *                   number:
- *                     type: string
- *                     example: "9876543210"
- *               personalInfo:
- *                 type: object
- *                 properties:
- *                   fullName:
- *                     type: string
- *                     example: Guru Nath
- *                   dob:
- *                     type: string
- *                     format: date
- *                     example: 1995-05-10
- *               location:
- *                 type: object
- *                 properties:
- *                   city:
- *                     type: string
- *                     example: Hyderabad
- *                   area:
- *                     type: string
- *                     example: Gachibowli
- *               vehicleInfo:
- *                 type: object
- *                 properties:
- *                   type:
- *                     type: string
- *                     example: bike
+ *               email:
+ *                 type: string
+ *                 example: test@gmail.com
+ *               countryCode:
+ *                 type: string
+ *                 example: "+91"
+ *               phoneNumber:
+ *                 type: string
+ *                 example: "9876543210"
+ *               streetAddress:
+ *                 type: string
+ *                 example: "12-3-456"
+ *               area:
+ *                 type: string
+ *                 example: "Kukatpally"
+ *               city:
+ *                 type: string
+ *                 example: "Hyderabad"
+ *               state:
+ *                 type: string
+ *                 example: "Telangana"
+ *               pincode:
+ *                 type: string
+ *                 example: "500072"
  *               selfie:
- *                 type: object
- *                 properties:
- *                   url:
- *                     type: string
- *                     example: https://deliverypartner.blob.core.windows.net/delivery/selfies/selfie.jpg
- *                   uploadedAt:
- *                     type: string
- *                     format: date-time
- *                     example: 2025-12-26T10:14:20.586Z
+ *                 type: string
+ *                 format: binary
+ *                 description: Upload selfie image (jpg/png). Stored in Azure Blob Storage.
  *     responses:
  *       200:
  *         description: Profile updated successfully
@@ -88,35 +71,33 @@ const { updateProfile,getAllDocuments,getWalletDetails,updateDocuments,getRiderO
  *                 message:
  *                   type: string
  *                   example: Profile updated successfully
+ *                 data:
+ *                   type: object
+ *                   example:
+ *                     city: Hyderabad
+ *                     selfie: https://azurebloburl/selfies/1704692123.jpg
+ *       400:
+ *         description: No data provided for update
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: No data provided for update
+ *       401:
+ *         description: Unauthorized
  *       404:
  *         description: Rider not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Rider not found
  *       500:
  *         description: Server error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Server error
  */
 
-router.put("/update", riderAuthMiddleWare,  uploadSelfie.single("selfie"),
+router.put("/update", riderAuthMiddleWare,  upload.single("selfie"),
  updateProfile);
 
 
@@ -683,6 +664,119 @@ router.get(
   "/orders/history",
   riderAuthMiddleWare,
   getRiderOrderHistory
+);
+/**
+ * @swagger
+ * /api/profile/slots/history:
+ *   get:
+ *     tags:
+ *       - Profile
+ *     summary: Get rider slot history
+ *     description: >
+ *       Fetches slot history for the authenticated rider with earnings and order statistics.
+ *       Supports daily, weekly, and monthly filters.
+ *       Orders are calculated day-wise for each slot.
+ *     security:
+ *       - bearerAuth: []
+ *
+ *     parameters:
+ *       - in: query
+ *         name: filter
+ *         schema:
+ *           type: string
+ *           enum: [daily, weekly, monthly]
+ *         required: false
+ *         description: Filter type for slot history
+ *
+ *       - in: query
+ *         name: date
+ *         schema:
+ *           type: string
+ *           example: "2026-01-05"
+ *         required: false
+ *         description: Specific date for daily filter (YYYY-MM-DD)
+ *
+ *       - in: query
+ *         name: month
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *         required: false
+ *         description: Month number for monthly filter (1-12)
+ *
+ *       - in: query
+ *         name: year
+ *         schema:
+ *           type: integer
+ *           example: 2026
+ *         required: false
+ *         description: Year for monthly filter
+ *
+ *     responses:
+ *       200:
+ *         description: Slot history fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 filter:
+ *                   type: string
+ *                   example: daily
+ *                 totalSlots:
+ *                   type: integer
+ *                   example: 1
+ *                 totalEarnings:
+ *                   type: number
+ *                   example: 60
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       slotBookingId:
+ *                         type: string
+ *                         example: "695b541094c6d3aa76cada71"
+ *                       date:
+ *                         type: string
+ *                         example: "2026-01-05"
+ *                       startTime:
+ *                         type: string
+ *                         example: "18:00"
+ *                       endTime:
+ *                         type: string
+ *                         example: "20:00"
+ *                       slotStatus:
+ *                         type: string
+ *                         enum: [ACTIVE, COMPLETED, CANCELED]
+ *                         example: COMPLETED
+ *                       totalOrders:
+ *                         type: integer
+ *                         example: 1
+ *                       completedOrders:
+ *                         type: integer
+ *                         example: 1
+ *                       canceledOrders:
+ *                         type: integer
+ *                         example: 0
+ *                       slotEarnings:
+ *                         type: number
+ *                         example: 60
+ *
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *
+ *       500:
+ *         description: Internal server error
+ */
+
+router.get(
+  "/slots/history",
+  riderAuthMiddleWare,
+  getSlotHistory
 );
 
 module.exports=router;
