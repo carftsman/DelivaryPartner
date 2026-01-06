@@ -547,35 +547,37 @@ router.get("/wallet", riderAuthMiddleWare, getWalletDetails);
  * @swagger
  * /api/profile/documents/update:
  *   put:
- *     summary: Update rider KYC documents
- *     description: Update or re-upload rider documents like Aadhaar, PAN, License, etc. Used when documents expire or change.
  *     tags:
  *       - Profile
+ *     summary: Upload or update KYC documents (PAN / Driving License)
+ *     description: >
+ *       Upload PAN card image and/or Driving License images.
+ *       The system will extract details using OCR.
+ *       If OCR fails, manual entry will be requested.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             properties:
- *               kyc:
- *                 type: object
- *                 example:
- *                   aadhaar:
- *                     number: "123456789012"
- *                     status: "verified"
- *                   pan:
- *                     number: "ABCDE1234F"
- *                     status: "pending"
- *                   drivingLicense:
- *                     number: "DL-0420110149646"
- *                     expiryDate: "2026-12-31"
- *                     status: "uploaded"
+ *               panImage:
+ *                 type: string
+ *                 format: binary
+ *                 description: PAN card image file
+ *               dlFrontImage:
+ *                 type: string
+ *                 format: binary
+ *                 description: Driving License front image
+ *               dlBackImage:
+ *                 type: string
+ *                 format: binary
+ *                 description: Driving License back image (optional)
  *     responses:
  *       200:
- *         description: Documents updated successfully
+ *         description: Documents uploaded successfully or manual entry required
  *         content:
  *           application/json:
  *             schema:
@@ -586,13 +588,58 @@ router.get("/wallet", riderAuthMiddleWare, getWalletDetails);
  *                   example: true
  *                 message:
  *                   type: string
- *                   example: Documents updated successfully
+ *                   example: PAN & Driving License submitted successfully
+ *                 warnings:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                   example:
+ *                     - PAN not detected. Please enter PAN manually.
  *                 data:
  *                   type: object
+ *                   properties:
+ *                     pan:
+ *                       type: object
+ *                       properties:
+ *                         number:
+ *                           type: string
+ *                           example: ABCDE1234F
+ *                         image:
+ *                           type: string
+ *                           example: https://blob-url/pan.webp
+ *                         status:
+ *                           type: string
+ *                           example: pending
+ *                     drivingLicense:
+ *                       type: object
+ *                       properties:
+ *                         number:
+ *                           type: string
+ *                           example: KA0120190001234
+ *                         frontImage:
+ *                           type: string
+ *                           example: https://blob-url/dl-front.webp
+ *                         backImage:
+ *                           type: string
+ *                           example: https://blob-url/dl-back.webp
+ *                         status:
+ *                           type: string
+ *                           example: pending
  *       400:
- *         description: Invalid input
+ *         description: Invalid request or no documents uploaded
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: No documents uploaded
  *       401:
- *         description: Unauthorized
+ *         description: Unauthorized rider
  *       404:
  *         description: Rider not found
  *       500:
@@ -601,7 +648,7 @@ router.get("/wallet", riderAuthMiddleWare, getWalletDetails);
 
 router.put(
   "/documents/update",
-  riderAuthMiddleWare,        // your auth middleware
+  riderAuthMiddleWare,        
   upload.fields([
     { name: "panImage", maxCount: 1 },
     { name: "dlFrontImage", maxCount: 1 },
@@ -876,10 +923,11 @@ router.get(
  *   put:
  *     tags:
  *       - Profile
- *     summary: Add / Update / Add another bank account
+ *     summary: Add or update rider bank details
  *     description: >
- *       Allows rider to add a new bank account or update an existing one
- *       when verification status is PENDING.
+ *       Adds or updates the rider's bank details.
+ *       The request body must contain a `bankDetails` object.
+ *       Bank verification status will be reset to PENDING on update.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -888,10 +936,9 @@ router.get(
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - bankDetails
  *             properties:
- *               accountId:
- *                 type: string
- *                 description: Existing bank account ID (only for update)
  *               bankDetails:
  *                 type: object
  *                 required:
@@ -910,6 +957,7 @@ router.get(
  *                     example: Gurunath
  *                   accountType:
  *                     type: string
+ *                     enum: [SAVINGS, CURRENT]
  *                     example: SAVINGS
  *                   branch:
  *                     type: string
@@ -922,7 +970,35 @@ router.get(
  *                     example: HDFC0001234
  *     responses:
  *       200:
- *         description: Bank account added or updated successfully
+ *         description: Bank details saved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Bank details saved successfully
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: All bank details are required
+ *       401:
+ *         description: Unauthorized rider
+ *       500:
+ *         description: Server error
  */
 
 router.put(

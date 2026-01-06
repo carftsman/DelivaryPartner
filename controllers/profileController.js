@@ -723,30 +723,13 @@ exports.addOrUpdateBankDetails = async (req, res) => {
       });
     }
 
-    // 🔴 DEBUG (DO NOT REMOVE UNTIL FIXED)
-    console.log("HEADERS:", req.headers["content-type"]);
-    console.log("RAW BODY:", req.body);
+    // ✅ READ NESTED BODY
+    const bankDetails = req.body?.bankDetails;
 
-    const rider = await Rider.findById(req.rider._id).select("bankAccounts");
-
-    if (!rider) {
-      return res.status(404).json({
-        success: false,
-        message: "Rider not found",
-      });
-    }
-
-    // ✅ SUPPORT ALL POSSIBLE BODY SHAPES
-    const body =
-      req.body?.bankDetails ||
-      req.body?.data?.bankDetails ||
-      req.body || null;
-
-    if (!body || Object.keys(body).length === 0) {
+    if (!bankDetails) {
       return res.status(400).json({
         success: false,
         message: "bankDetails object is required",
-        hint: "Send JSON with Content-Type: application/json",
       });
     }
 
@@ -757,85 +740,53 @@ exports.addOrUpdateBankDetails = async (req, res) => {
       branch,
       accountNumber,
       ifscCode,
-    } = body;
+    } = bankDetails;
 
-    const missing = [];
-    if (!bankName) missing.push("bankName");
-    if (!accountHolderName) missing.push("accountHolderName");
-    if (!accountType) missing.push("accountType");
-    if (!accountNumber) missing.push("accountNumber");
-    if (!ifscCode) missing.push("ifscCode");
-
-    if (missing.length) {
+    // ✅ VALIDATION
+    if (
+      !bankName ||
+      !accountHolderName ||
+      !accountType ||
+      !branch ||
+      !accountNumber ||
+      !ifscCode
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Missing required bank fields",
-        missing,
+        message: "All bank details are required",
       });
     }
 
-    const accountId = req.body?.accountId;
+    await Rider.findByIdAndUpdate(
+      req.rider._id,
+      {
+        $set: {
+          bankDetails: {
+            bankName: bankName.trim(),
+            accountHolderName: accountHolderName.trim(),
+            accountType,
+            branch,
+            accountNumber,
+            ifscCode: ifscCode.toUpperCase(),
+            addedBankAccount: true,
+            ifscVerificationStatus: "PENDING",
+            bankVerificationStatus: "PENDING",
+            verifiedAt: null,
+          },
+        },
+      },
+      { runValidators: true }
+    );
 
-    // 🔁 UPDATE EXISTING ACCOUNT
-    if (accountId) {
-      const account = rider.bankAccounts.id(accountId);
-
-      if (!account) {
-        return res.status(404).json({
-          success: false,
-          message: "Bank account not found",
-        });
-      }
-
-      if (account.bankVerificationStatus === "VERIFIED") {
-        return res.status(400).json({
-          success: false,
-          message: "Verified bank account cannot be updated",
-        });
-      }
-
-      Object.assign(account, {
-        bankName: bankName.trim(),
-        accountHolderName: accountHolderName.trim(),
-        accountType,
-        branch,
-        accountNumber,
-        ifscCode: ifscCode.toUpperCase(),
-        bankVerificationStatus: "PENDING",
-        ifscVerificationStatus: "PENDING",
-        verifiedAt: null,
-      });
-
-      await rider.save();
-
-      return res.json({
-        success: true,
-        message: "Bank account updated successfully",
-      });
-    }
-
-    // ➕ ADD NEW BANK ACCOUNT
-    rider.bankAccounts.push({
-      bankName: bankName.trim(),
-      accountHolderName: accountHolderName.trim(),
-      accountType,
-      branch,
-      accountNumber,
-      ifscCode: ifscCode.toUpperCase(),
-      isPrimary: rider.bankAccounts.length === 0,
-    });
-
-    await rider.save();
-
-    return res.json({
+    return res.status(200).json({
       success: true,
-      message: "New bank account added successfully",
+      message: "Bank details saved successfully",
     });
   } catch (error) {
-    console.error("Add Bank Error:", error);
+    console.error("Add/Update Bank Error:", error);
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Failed to save bank details",
     });
   }
 };
