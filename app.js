@@ -15,7 +15,7 @@ const staticRouter = require("./routes/staticMobileOtpRoute");
 const profileRoutes = require("./routes/profileRoutes");
 const incentiveRoutes = require("./routes/incentiveRoutes");
 const insuranceRoutes = require("./routes/insuranceRoutes");
-
+const issueRouter =  require("./routes/issueRoutes")
 
 // const offlineStoreRoute = require("./routes/offlineStoreRoute");
 
@@ -72,6 +72,9 @@ app.use('/api/profile',profileRoutes)
 
 app.use("/api/home", incentiveRoutes);
 app.use("/api/profile/insurance", insuranceRoutes);
+
+app.use("/api/issues", issueRouter);
+
 
 
 app.get("/", (req, res) => {

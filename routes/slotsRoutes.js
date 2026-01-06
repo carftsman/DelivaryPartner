@@ -1,7 +1,7 @@
 const express = require("express");
 const slotRouter = express.Router();
 
-const { getWeeklySlots, getDailySlots ,bookSlot , cancelSlot ,getCurrentSlot ,getDailySlotsWithStatus, getSlotHistory} = require("../controllers/slotsController");
+const { getWeeklySlots, getDailySlots ,bookSlot , cancelSlot ,getCurrentSlot ,getDailySlotsWithStatus, getSlotHistory ,  getCurrentAndNextSlot} = require("../controllers/slotsController");
 const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
 
 /**
@@ -640,6 +640,43 @@ slotRouter.get("/status", riderAuthMiddleWare, getDailySlotsWithStatus);
 
 
 slotRouter.get("/history", riderAuthMiddleWare, getSlotHistory);
+
+/**
+ * @swagger
+ * /api/slots/activeSlots:
+ *   get:
+ *     tags: [Slots]
+ *     summary: Get current running slot and next upcoming booked slot
+ *     security:
+ *       - bearerAuth: []
+ *     description: >
+ *       Returns the rider's current active booked slot (if time is between slot start & end).  
+ *       Also returns the next upcoming booked slot for today or the next day.
+ *     responses:
+ *       200:
+ *         description: Current & next slot fetched
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               currentSlot:
+ *                 date: "2026-01-03"
+ *                 startTime: "08:00"
+ *                 endTime: "10:00"
+ *                 status: "BOOKED"
+ *               nextSlot:
+ *                 date: "2026-01-03"
+ *                 startTime: "12:00"
+ *                 endTime: "14:00"
+ *                 status: "BOOKED"
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
+
+
+slotRouter.get("/activeSlots", riderAuthMiddleWare, getCurrentAndNextSlot);
 
 
 module.exports = slotRouter;

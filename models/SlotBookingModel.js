@@ -207,7 +207,12 @@ const SlotBookingSchema = new mongoose.Schema(
       default: "BOOKED",
       index: true
     },
-
+    progress: {
+        type: String,
+        enum: ["UPCOMING", "RUNNING", "COMPLETED", "MISSED"],
+        default: "UPCOMING",
+        index: true
+    },
     bookedFrom: {
       type: String,
       enum: ["APP", "ADMIN"],
