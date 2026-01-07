@@ -42,7 +42,7 @@ exports.getWeeklyIncentiveEarning = async (req, res) => {
       createdAt: { $gte: startOfWeek, $lte: endOfWeek }
     });
  
-    const requiredOrders = incentive.condition?.minOrders || 0;
+    const requiredOrders = incentive.condition?.minOrders 
     const achieved = completedOrders >= requiredOrders;
  
     return res.status(200).json({

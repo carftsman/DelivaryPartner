@@ -89,6 +89,10 @@ app.use("/api/issues", issueRouter);
 
 app.use("/api/earnings", require("./routes/earningsRoutes"));
 
+//order routes
+
+app.use("/api/orders", require("./routes/orderRoutes"));
+
 app.get("/", (req, res) => {
   res.send("Vega Delivery Partner API Running. Open /api-docs");
 });
