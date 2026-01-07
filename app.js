@@ -1,5 +1,5 @@
 const express = require("express");
-const { swaggerSetup } = require("./config/swagger");
+const { swaggerSetup } = require("./docs/swagger");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const cors = require('cors')
@@ -21,6 +21,8 @@ const earningsRoutes = require("./routes/earningsRoutes");
 
 
 const insuranceRoutes = require("./routes/insuranceRoutes");
+const issueRouter =  require("./routes/issueRoutes")
+
 
 
 // const offlineStoreRoute = require("./routes/offlineStoreRoute");
@@ -81,6 +83,11 @@ app.use("/api/home", incentiveRoutes);
 app.use("/api/rider/earnings", earningsRoutes);
 app.use("/api/profile/insurance", insuranceRoutes);
 
+app.use("/api/issues", issueRouter);
+
+
+
+app.use("/api/earnings", require("./routes/earningsRoutes"));
 
 app.get("/", (req, res) => {
   res.send("Vega Delivery Partner API Running. Open /api-docs");

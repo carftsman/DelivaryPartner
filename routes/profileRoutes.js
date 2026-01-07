@@ -7,7 +7,14 @@ const {getKitAddress}=require('../controllers/kitAddressController')
 const uploadSelfie = require("../middleware/uploadSelfie");
 const { upload } = require("../utils/azureUpload");
 
-const { updateProfile,getAllDocuments,getWalletDetails,updateDocuments,getRiderOrderHistory,getSlotHistory } = require("../controllers/profileController");
+const { updateProfile,
+  getAllDocuments,
+  getWalletDetails,
+  updateDocuments,
+  getRiderOrderHistory,
+  getSlotHistory,
+  addOrUpdateBankDetails,
+  getMyAssetsSummary } = require("../controllers/profileController");
 
 /**
  * @swagger
@@ -268,54 +275,105 @@ router.get("/bank-details", riderAuthMiddleWare, getBankDetails);
  
 /**
  * @swagger
- * /api/profile/kit-address:
+ * /api/profile/assets:
  *   get:
- *     tags: [Profile]
- *     summary: Get kit delivery address
- *     description: Fetches the kit delivery address of the authenticated rider.
- *
+ *     tags:
+ *       - Profile
+ *     summary: Get rider asset summary
+ *     description: >
+ *       Fetches the logged-in rider's asset summary using JWT token.
+ *       Returns total assets count, number of assets in BAD condition,
+ *       whether the rider can raise a request, and detailed asset list
+ *       with issued date and condition.
  *     security:
  *       - bearerAuth: []
  *
  *     responses:
  *       200:
- *         description: Kit delivery address fetched successfully
+ *         description: Rider asset summary fetched successfully
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 message:
- *                   type: string
- *                   example: "Kit delivery address fetched successfully"
+ *                 success:
+ *                   type: boolean
+ *                   example: true
  *                 data:
  *                   type: object
  *                   properties:
- *                     name:
- *                       type: string
- *                       example: "Suji"
- *                     completeAddress:
- *                       type: string
- *                       example: "Flat 203, Main Road, Near Metro Station"
- *                     pincode:
- *                       type: string
- *                       example: "560001"
+ *                     totalAssets:
+ *                       type: number
+ *                       example: 3
+ *                     badConditionCount:
+ *                       type: number
+ *                       example: 1
+ *                     canRaiseRequest:
+ *                       type: boolean
+ *                       example: true
+ *                     assets:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           assetId:
+ *                             type: string
+ *                             example: "661a9f8c1234567890abcd"
+ *                           assetType:
+ *                             type: string
+ *                             example: HELMET
+ *                           assetName:
+ *                             type: string
+ *                             example: Steelbird Helmet
+ *                           quantity:
+ *                             type: number
+ *                             example: 1
+ *                           condition:
+ *                             type: string
+ *                             example: BAD
+ *                           issuedDate:
+ *                             type: string
+ *                             format: date-time
+ *                             example: "2026-01-02T10:00:00.000Z"
+ *                           canRaiseRequest:
+ *                             type: boolean
+ *                             example: true
  *
  *       401:
  *         description: Unauthorized – invalid or missing token
- *
- *       404:
- *         description: Kit delivery address not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Unauthorized
  *
  *       500:
- *         description: Server error while fetching kit address
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Failed to fetch asset summary
  */
+
  
  
 router.get(
-  "/kit-address",
+  "/assets",
   riderAuthMiddleWare,
-  getKitAddress
+  getMyAssetsSummary
 );
 /**
  * @swagger
@@ -489,35 +547,37 @@ router.get("/wallet", riderAuthMiddleWare, getWalletDetails);
  * @swagger
  * /api/profile/documents/update:
  *   put:
- *     summary: Update rider KYC documents
- *     description: Update or re-upload rider documents like Aadhaar, PAN, License, etc. Used when documents expire or change.
  *     tags:
  *       - Profile
+ *     summary: Upload or update KYC documents (PAN / Driving License)
+ *     description: >
+ *       Upload PAN card image and/or Driving License images.
+ *       The system will extract details using OCR.
+ *       If OCR fails, manual entry will be requested.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             properties:
- *               kyc:
- *                 type: object
- *                 example:
- *                   aadhaar:
- *                     number: "123456789012"
- *                     status: "verified"
- *                   pan:
- *                     number: "ABCDE1234F"
- *                     status: "pending"
- *                   drivingLicense:
- *                     number: "DL-0420110149646"
- *                     expiryDate: "2026-12-31"
- *                     status: "uploaded"
+ *               panImage:
+ *                 type: string
+ *                 format: binary
+ *                 description: PAN card image file
+ *               dlFrontImage:
+ *                 type: string
+ *                 format: binary
+ *                 description: Driving License front image
+ *               dlBackImage:
+ *                 type: string
+ *                 format: binary
+ *                 description: Driving License back image (optional)
  *     responses:
  *       200:
- *         description: Documents updated successfully
+ *         description: Documents uploaded successfully or manual entry required
  *         content:
  *           application/json:
  *             schema:
@@ -528,13 +588,58 @@ router.get("/wallet", riderAuthMiddleWare, getWalletDetails);
  *                   example: true
  *                 message:
  *                   type: string
- *                   example: Documents updated successfully
+ *                   example: PAN & Driving License submitted successfully
+ *                 warnings:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                   example:
+ *                     - PAN not detected. Please enter PAN manually.
  *                 data:
  *                   type: object
+ *                   properties:
+ *                     pan:
+ *                       type: object
+ *                       properties:
+ *                         number:
+ *                           type: string
+ *                           example: ABCDE1234F
+ *                         image:
+ *                           type: string
+ *                           example: https://blob-url/pan.webp
+ *                         status:
+ *                           type: string
+ *                           example: pending
+ *                     drivingLicense:
+ *                       type: object
+ *                       properties:
+ *                         number:
+ *                           type: string
+ *                           example: KA0120190001234
+ *                         frontImage:
+ *                           type: string
+ *                           example: https://blob-url/dl-front.webp
+ *                         backImage:
+ *                           type: string
+ *                           example: https://blob-url/dl-back.webp
+ *                         status:
+ *                           type: string
+ *                           example: pending
  *       400:
- *         description: Invalid input
+ *         description: Invalid request or no documents uploaded
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: No documents uploaded
  *       401:
- *         description: Unauthorized
+ *         description: Unauthorized rider
  *       404:
  *         description: Rider not found
  *       500:
@@ -543,27 +648,30 @@ router.get("/wallet", riderAuthMiddleWare, getWalletDetails);
 
 router.put(
   "/documents/update",
-  riderAuthMiddleWare,        // your auth middleware
+  riderAuthMiddleWare,        
+  upload.fields([
+    { name: "panImage", maxCount: 1 },
+    { name: "dlFrontImage", maxCount: 1 },
+    { name: "dlBackImage", maxCount: 1 }
+  ]),
   updateDocuments
 );
 /**
  * @swagger
  * /api/profile/orders/history:
  *   get:
- *     summary: Get Rider Order History
- *     description: >
- *       Fetch delivered orders for the logged-in rider.
- *       Supports daily, weekly, monthly, or all-time filters.
- *       Returns totals (orders, earnings, distance, rating) and
- *       detailed order data including items, pricing, and delivery address.
  *     tags:
  *       - Profile
+ *     summary: Get Rider Order History
+ *     description: >
+ *       Fetches delivered order history for the authenticated rider.
+ *       Supports daily, weekly, monthly, and all-time filters.
+ *       Returns order details along with earnings, distance, and ratings summary.
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: filter
- *         required: false
  *         schema:
  *           type: string
  *           enum: [all, daily, weekly, monthly]
@@ -571,7 +679,7 @@ router.put(
  *         description: Filter orders by time range
  *     responses:
  *       200:
- *         description: Rider order history fetched successfully
+ *         description: Order history fetched successfully
  *         content:
  *           application/json:
  *             schema:
@@ -582,20 +690,19 @@ router.put(
  *                   example: true
  *                 filter:
  *                   type: string
- *                   example: monthly
+ *                   example: weekly
  *                 totalOrders:
  *                   type: integer
- *                   example: 5
+ *                   example: 12
  *                 totalEarnings:
  *                   type: number
- *                   example: 916
+ *                   example: 2450.75
  *                 totalDistance:
  *                   type: number
- *                   example: 42.7
+ *                   example: 134.5
  *                 avgRating:
- *                   type: number
- *                   nullable: true
- *                   example: 4.6
+ *                   type: string
+ *                   example: "4.6"
  *                 data:
  *                   type: array
  *                   items:
@@ -603,7 +710,7 @@ router.put(
  *                     properties:
  *                       orderId:
  *                         type: string
- *                         example: ORD-GURU-001
+ *                         example: ORD123456
  *                       items:
  *                         type: array
  *                         items:
@@ -611,53 +718,85 @@ router.put(
  *                           properties:
  *                             itemName:
  *                               type: string
- *                               example: Tomato
+ *                               example: Pizza
  *                             quantity:
  *                               type: integer
  *                               example: 2
  *                             price:
  *                               type: number
- *                               example: 40
+ *                               example: 199
  *                             total:
  *                               type: number
- *                               example: 80
+ *                               example: 398
  *                       pricing:
  *                         type: object
  *                         properties:
  *                           itemTotal:
  *                             type: number
- *                             example: 60
+ *                             example: 398
  *                           deliveryFee:
  *                             type: number
- *                             example: 25
+ *                             example: 40
  *                           tax:
  *                             type: number
- *                             example: 5
+ *                             example: 20
  *                           platformCommission:
  *                             type: number
- *                             example: 5
+ *                             example: 15
  *                           totalAmount:
  *                             type: number
- *                             example: 95
+ *                             example: 443
  *                       customerTip:
  *                         type: number
- *                         example: 10
+ *                         example: 25
  *                       distanceTravelled:
  *                         type: number
- *                         example: 5.2
+ *                         example: 7.8
+ *                       durationInMin:
+ *                         type: number
+ *                         example: 32
+ *                       pickupAddress:
+ *                         type: string
+ *                         example: "MG Road, Bengaluru"
+ *                       deliveredAddress:
+ *                         type: string
+ *                         example: "Indiranagar, Bengaluru"
+ *                       deliveredAt:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2026-01-05T14:32:10.000Z"
  *                       rating:
  *                         type: number
  *                         nullable: true
  *                         example: 5
- *                       deliveredAddress:
- *                         type: string
- *                         example: Kondapur
  *       400:
  *         description: Rider ID missing
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Rider ID missing
  *       401:
  *         description: Unauthorized
  *       500:
  *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Server error
  */
 
 router.get(
@@ -778,5 +917,99 @@ router.get(
   riderAuthMiddleWare,
   getSlotHistory
 );
+/**
+ * @swagger
+ * /api/profile/bank-details:
+ *   put:
+ *     tags:
+ *       - Profile
+ *     summary: Add or update rider bank details
+ *     description: >
+ *       Adds or updates the rider's bank details.
+ *       The request body must contain a `bankDetails` object.
+ *       Bank verification status will be reset to PENDING on update.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - bankDetails
+ *             properties:
+ *               bankDetails:
+ *                 type: object
+ *                 required:
+ *                   - bankName
+ *                   - accountHolderName
+ *                   - accountType
+ *                   - branch
+ *                   - accountNumber
+ *                   - ifscCode
+ *                 properties:
+ *                   bankName:
+ *                     type: string
+ *                     example: HDFC Bank
+ *                   accountHolderName:
+ *                     type: string
+ *                     example: Gurunath
+ *                   accountType:
+ *                     type: string
+ *                     enum: [SAVINGS, CURRENT]
+ *                     example: SAVINGS
+ *                   branch:
+ *                     type: string
+ *                     example: Madhapur
+ *                   accountNumber:
+ *                     type: string
+ *                     example: "987654321098"
+ *                   ifscCode:
+ *                     type: string
+ *                     example: HDFC0001234
+ *     responses:
+ *       200:
+ *         description: Bank details saved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Bank details saved successfully
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: All bank details are required
+ *       401:
+ *         description: Unauthorized rider
+ *       500:
+ *         description: Server error
+ */
+
+router.put(
+
+  "/bank-details",
+
+  riderAuthMiddleWare,
+
+  addOrUpdateBankDetails
+
+);
+
 
 module.exports=router;

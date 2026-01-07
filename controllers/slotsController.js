@@ -1095,3 +1095,78 @@ exports.getSlotHistory = async (req, res) => {
     });
   }
 };
+
+
+
+
+exports.getCurrentAndNextSlot = async (req, res) => {
+  try {
+    const riderId = req.rider._id;
+
+    const now = new Date();
+    const todayDate = now.toISOString().split("T")[0];
+
+    // Fetch today's booked slots
+    let todaySlots = await SlotBooking.find({
+      riderId,
+      date: todayDate,
+      status: "BOOKED"
+    }).sort({ startTime: 1 });
+
+    // If no slots today, check tomorrow
+    const tomorrowDate = new Date(now);
+    tomorrowDate.setDate(now.getDate() + 1);
+    const tomorrow = tomorrowDate.toISOString().split("T")[0];
+
+    let tomorrowSlots = [];
+    if (todaySlots.length === 0) {
+      tomorrowSlots = await SlotBooking.find({
+        riderId,
+        date: tomorrow,
+        status: "BOOKED"
+      }).sort({ startTime: 1 });
+    }
+
+    const allSlots = [...todaySlots, ...tomorrowSlots];
+
+    if (allSlots.length === 0) {
+      return res.json({
+        success: true,
+        message: "No booked slots found",
+        currentSlot: null,
+        nextSlot: null
+      });
+    }
+
+    let currentSlot = null;
+    let nextSlot = null;
+
+    for (let slot of allSlots) {
+      const slotStart = new Date(`${slot.date}T${slot.startTime}:00`);
+      const slotEnd = new Date(`${slot.date}T${slot.endTime}:00`);
+
+      if (now >= slotStart && now <= slotEnd) {
+        currentSlot = slot;
+      }
+
+      if (slotStart > now && !nextSlot) {
+        nextSlot = slot;
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: "Current & next slot fetched",
+      currentSlot,
+      nextSlot
+    });
+
+  } catch (err) {
+    console.error("Current/Next Slot Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
+  }
+};
+

@@ -2,9 +2,16 @@
 
 const Rider = require("../models/RiderModel");
 const Order = require("../models/OrderSchema");
+const RiderAssets = require("../models/RiderAsset");
+
 const mongoose=require('mongoose')
 const { extractTextFromImage } = require("../utils/ocr");
-const { extractPAN, extractDL } = require("../utils/kycParser");
+const {
+  extractPAN,
+  extractDL,
+  extractDLExpiry,
+  isExpiringWithinOneMonth
+} = require("../utils/kycParser");
 const { uploadToAzure } = require("../utils/azureUpload"); // path adjust
 const SlotBooking = require("../models/SlotBookingModel");
 
@@ -185,29 +192,61 @@ exports.getBankDetails = async (req, res) => {
     });
   }
 };
-exports.getKitAddress = async (req, res) => {
+exports.getMyAssetsSummary = async (req, res) => {
   try {
     const riderId = req.rider._id;
- 
-    const rider = await Rider.findById(
-      riderId,
-      "kitDeliveryAddress.name kitDeliveryAddress.completeAddress kitDeliveryAddress.pincode"
-    );
- 
-    if (!rider || !rider.kitDeliveryAddress) {
-      return res.status(404).json({
-        message: "Kit delivery address not found",
+
+    const doc = await RiderAssets.findOne({ riderId }).lean();
+
+    if (!doc || !doc.assets || doc.assets.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          totalAssets: 0,
+          badConditionCount: 0,
+          canRaiseRequest: false,
+          assets: [],
+        },
       });
     }
- 
-    res.status(200).json({
-      message: "Kit delivery address fetched successfully",
-      data: rider.kitDeliveryAddress,
+
+    let totalAssets = 0;
+    let badConditionCount = 0;
+
+    const formattedAssets = doc.assets.map(asset => {
+      const qty = asset.quantity || 1;
+
+      totalAssets += qty;
+
+      if (asset.condition === "BAD") {
+        badConditionCount += qty;
+      }
+
+      return {
+        assetId: asset._id,
+        assetType: asset.assetType,
+        assetName: asset.assetName,
+        quantity: qty,
+        condition: asset.condition,
+        issuedDate: asset.issuedDate,
+        canRaiseRequest: asset.condition === "BAD",
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        totalAssets,
+        badConditionCount,
+        canRaiseRequest: badConditionCount > 0,
+        assets: formattedAssets,
+      },
     });
   } catch (error) {
-    res.status(500).json({
-      message: "Failed to fetch kit delivery address",
-      error: error.message,
+    console.error("Assets Summary Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch asset summary",
     });
   }
 };
@@ -254,102 +293,140 @@ exports.updateDocuments = async (req, res) => {
     }
 
     rider.kyc = rider.kyc || {};
-
     const updatedDocs = [];
+    const warnings = [];
 
     /* ================= PAN ================= */
-    if (req.files?.panImage?.[0]) {
-      const panImageUrl = await uploadToAzure(req.files.panImage[0], "pan");
+    if (req.files?.panImage?.length) {
+      const panFile = req.files.panImage[0];
 
-      const text = await extractTextFromImage(panImageUrl);
+      let text;
+      try {
+        text = await extractTextFromImage(panFile);
+        console.log("PAN OCR TEXT 👉", text);
+      } catch (err) {
+        return res.status(400).json({ success: false, message: err.message });
+      }
+
       const panNumber = extractPAN(text);
 
       if (!panNumber) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid PAN image"
-        });
+        warnings.push("PAN not detected. Please enter PAN manually.");
+      } else {
+        const panUrl = await uploadToAzure(panFile, "pan");
+
+        rider.kyc.pan = {
+          number: panNumber,
+          image: panUrl,
+
+          // ✅ INITIAL STATE
+          status: "pending",
+          isVerified: false,
+
+          updatedAt: new Date()
+        };
+
+        updatedDocs.push("PAN");
       }
-
-      rider.kyc.pan = {
-        number: panNumber,
-        image: panImageUrl,
-        status: "approved",
-        isVerified: true,
-        updatedAt: new Date()
-      };
-
-      updatedDocs.push("PAN");
     }
 
     /* ================= DRIVING LICENSE ================= */
-    if (req.files?.dlFrontImage?.[0]) {
-      const frontUrl = await uploadToAzure(req.files.dlFrontImage[0], "dl-front");
-      const backUrl = req.files?.dlBackImage?.[0]
-        ? await uploadToAzure(req.files.dlBackImage[0], "dl-back")
-        : rider.kyc.drivingLicense?.backImage;
+    if (req.files?.dlFrontImage?.length) {
+      const dlFrontFile = req.files.dlFrontImage[0];
 
-      const text = await extractTextFromImage(frontUrl);
+      let text;
+      try {
+        text = await extractTextFromImage(dlFrontFile);
+      } catch (err) {
+        return res.status(400).json({ success: false, message: err.message });
+      }
+
       const dlNumber = extractDL(text);
+      const expiryDate = extractDLExpiry(text);
 
       if (!dlNumber) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid Driving License image"
-        });
+        warnings.push("Driving License number not detected clearly.");
+      } else {
+        const expiryAlert = isExpiringWithinOneMonth(expiryDate);
+
+        const frontUrl = await uploadToAzure(dlFrontFile, "dl-front");
+        const backUrl = req.files?.dlBackImage?.length
+          ? await uploadToAzure(req.files.dlBackImage[0], "dl-back")
+          : rider.kyc.drivingLicense?.backImage || null;
+
+        rider.kyc.drivingLicense = {
+          number: dlNumber,
+          frontImage: frontUrl,
+          backImage: backUrl,
+          expiryDate,
+          expiryAlert,
+
+          // ✅ INITIAL STATE
+          status: "pending",
+          isVerified: false,
+
+          updatedAt: new Date()
+        };
+
+        updatedDocs.push("Driving License");
       }
-
-      rider.kyc.drivingLicense = {
-        number: dlNumber,
-        frontImage: frontUrl,
-        backImage: backUrl,
-        status: "approved",
-        isVerified: true,
-        updatedAt: new Date()
-      };
-
-      updatedDocs.push("Driving License");
     }
 
-    /* ================= NO FILE UPLOADED ================= */
-    if (updatedDocs.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "No documents uploaded"
-      });
+    if (
+  !req.files?.panImage?.length &&
+  !req.files?.dlFrontImage?.length
+) {
+  return res.status(400).json({
+    success: false,
+    message: "No documents uploaded"
+  });
+}
+
+    /* ================= MANUAL ENTRY REQUIRED ================= */
+if (updatedDocs.length === 0 && warnings.length > 0) {
+  return res.status(200).json({
+    success: true,
+    message: `${warnings[0]} Please enter manually.`,
+    data: {
+      enterManually: true,
+      document: warnings[0].includes("Driving License")
+        ? "drivingLicense"
+        : "pan"
     }
+  });
+}
 
-    await rider.save();
 
-    /* ================= RESPONSE ================= */
-    return res.status(200).json({
-      success: true,
-      message: `${updatedDocs.join(" & ")} updated successfully`,
-      data: {
-        ...(rider.kyc.pan && {
-          pan: {
-            number: rider.kyc.pan.number,
-            image: rider.kyc.pan.image,
-            status: rider.kyc.pan.status
-          }
-        }),
-        ...(rider.kyc.drivingLicense && {
-          drivingLicense: {
-            number: rider.kyc.drivingLicense.number,
-            frontImage: rider.kyc.drivingLicense.frontImage,
-            backImage: rider.kyc.drivingLicense.backImage,
-            status: rider.kyc.drivingLicense.status
-          }
-        })
-      }
-    });
+    /* ================= NO VALID UPDATE ================= */
+/* ================= FINAL RESPONSE ================= */
+const responseData = {};
 
+if (updatedDocs.includes("PAN")) {
+  responseData.pan = {
+    number: rider.kyc.pan.number,
+    image: rider.kyc.pan.image,
+    status: rider.kyc.pan.status
+  };
+}
+
+if (updatedDocs.includes("Driving License")) {
+  responseData.drivingLicense = {
+    number: rider.kyc.drivingLicense.number,
+    frontImage: rider.kyc.drivingLicense.frontImage,
+    backImage: rider.kyc.drivingLicense.backImage,
+    status: rider.kyc.drivingLicense.status
+  };
+}
+
+return res.status(200).json({
+  success: true,
+  message: `${updatedDocs.join(" & ")} submitted successfully`,
+  warnings,
+  data: responseData
+});
   } catch (err) {
     console.error("Update Documents Error:", err);
-    return res.status(500).json({
-      success: false,
-      message: "Server error"
-    });
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 // helper (make sure this exists)
@@ -600,10 +677,13 @@ exports.getRiderOrderHistory = async (req, res) => {
       distanceTravelled: order.tracking?.distanceInKm || 0,
 
       durationInMin: order.tracking?.durationInMin || 0,
+      pickupAddress: order.pickupAddress?.addressLine || "",
 
       rating: order.rating || null,
 
-deliveredAddress: order.deliveryAddress?.addressLine || ""
+deliveredAddress: order.deliveryAddress?.addressLine || "",
+  deliveredAt: order.deliveredAt || order.updatedAt || null
+
     }));
 
     return res.status(200).json({
@@ -624,3 +704,96 @@ deliveredAddress: order.deliveryAddress?.addressLine || ""
     });
   }
 };
+/**
+
+* ============================================================
+
+* UPDATE BANK DETAILS (PUT)
+
+* ============================================================
+
+*/
+
+exports.addOrUpdateBankDetails = async (req, res) => {
+  try {
+    if (!req.rider?._id) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized rider",
+      });
+    }
+
+    // ✅ READ NESTED BODY
+    const bankDetails = req.body?.bankDetails;
+
+    if (!bankDetails) {
+      return res.status(400).json({
+        success: false,
+        message: "bankDetails object is required",
+      });
+    }
+
+    const {
+      bankName,
+      accountHolderName,
+      accountType,
+      branch,
+      accountNumber,
+      ifscCode,
+    } = bankDetails;
+
+    // ✅ VALIDATION
+    if (
+      !bankName ||
+      !accountHolderName ||
+      !accountType ||
+      !branch ||
+      !accountNumber ||
+      !ifscCode
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "All bank details are required",
+      });
+    }
+
+    await Rider.findByIdAndUpdate(
+      req.rider._id,
+      {
+        $set: {
+          bankDetails: {
+            bankName: bankName.trim(),
+            accountHolderName: accountHolderName.trim(),
+            accountType,
+            branch,
+            accountNumber,
+            ifscCode: ifscCode.toUpperCase(),
+            addedBankAccount: true,
+            ifscVerificationStatus: "PENDING",
+            bankVerificationStatus: "PENDING",
+            verifiedAt: null,
+          },
+        },
+      },
+      { runValidators: true }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Bank details saved successfully",
+    });
+  } catch (error) {
+    console.error("Add/Update Bank Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to save bank details",
+    });
+  }
+};
+
+ 
+ 
+ 
+
+
+ 

@@ -54,11 +54,62 @@ const OrderSchema = new Schema(
     },
  
     // Rider Earning
+    // Rider Earning
+
     riderEarning: {
-      amount: Number,
-      credited: { type: Boolean, default: false }
+
+      basePay: {
+
+      type: Number,
+
+      default: 0
+
     },
  
+    distancePay: {
+
+      type: Number,
+
+      default: 0
+
+    },
+ 
+    surgePay: {
+
+      type: Number,
+
+      default: 0
+
+    },
+ 
+    tips: {
+
+      type: Number,
+
+      default: 0
+
+    },
+ 
+    totalEarning: {
+
+      type: Number,
+
+      default: 0
+
+    },
+ 
+    credited: {
+
+      type: Boolean,
+
+      default: false
+
+    }
+
+  },
+
+ 
+    
     // Order Status
     orderStatus: {
       type: String,
@@ -111,6 +162,7 @@ const OrderSchema = new Schema(
   },
   { timestamps: true }
 );
+
  
 module.exports = mongoose.model(
   "Order",
