@@ -293,6 +293,15 @@ location: {
           default: "pending",
         },
         rejectionReason: String,
+                    ocrAttempts: {
+    type: Number,
+    default: 0
+  },
+  allowManual: {
+    type: Boolean,
+    default: false
+  },
+
       },
  
       drivingLicense: {
@@ -305,6 +314,15 @@ location: {
           default: "pending",
         },
         rejectionReason: String,
+            ocrAttempts: {
+    type: Number,
+    default: 0
+  },
+  allowManual: {
+    type: Boolean,
+    default: false
+  },
+
       },
     },
     // Additional fields can be added as needed
@@ -425,7 +443,7 @@ location: {
       }
     },
  
- 
+
   },
   { timestamps: true }
 );
