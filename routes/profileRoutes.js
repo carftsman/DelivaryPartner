@@ -548,145 +548,6 @@ router.get("/wallet", riderAuthMiddleWare, getWalletDetails);
  * /api/profile/documents/update:
  *   put:
  *     tags:
- *       -Profile
- *     summary: Upload or update PAN and Driving License documents
- *     description: >
- *       Upload PAN or Driving License images using OCR.
- *       If OCR fails twice, manual update is allowed.
- *       Supports multipart file uploads and JSON-based manual updates.
- *
- *       **Flow:**
- *       - Upload image first
- *       - If image is blur → retry upload
- *       - After 2 failures → manual update allowed
- *
- *     security:
- *       - bearerAuth: []
- *
- *     requestBody:
- *       required: false
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               panImage:
- *                 type: string
- *                 format: binary
- *                 description: PAN card image
- *               dlFrontImage:
- *                 type: string
- *                 format: binary
- *                 description: Driving License front image
- *               dlBackImage:
- *                 type: string
- *                 format: binary
- *                 description: Driving License back image (optional)
- *
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               panNumber:
- *                 type: string
- *                 example: ABCDE1234F
- *                 description: Manual PAN number (allowed only after OCR failure)
- *               dlNumber:
- *                 type: string
- *                 example: DL1420110012345
- *                 description: Manual Driving License number (allowed only after OCR failure)
- *               expiryDate:
- *                 type: string
- *                 format: date
- *                 example: 2030-05-12
- *                 description: Driving License expiry date (manual entry)
- *
- *     responses:
- *       200:
- *         description: Document uploaded or updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: PAN uploaded successfully
- *                 data:
- *                   type: object
- *                   properties:
- *                     pan:
- *                       type: object
- *                       properties:
- *                         number:
- *                           type: string
- *                           example: ABCDE1234F
- *                         image:
- *                           type: string
- *                           example: https://deliverypartner.blob.core.windows.net/delivery/pan/sample.webp
- *                     drivingLicense:
- *                       type: object
- *                       properties:
- *                         number:
- *                           type: string
- *                           example: DL1420110012345
- *
- *       400:
- *         description: OCR failed or no valid input
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: PAN image is blur. Please upload a clear image.
- *                 allowManual:
- *                   type: boolean
- *                   example: false
- *
- *       403:
- *         description: Manual update not allowed
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Manual PAN update not allowed yet
- *
- *       401:
- *         description: Unauthorized
- *
- *       500:
- *         description: Server error
- */
-
-router.put(
-  "/documents/update",
-  riderAuthMiddleWare,        
-  upload.fields([
-    { name: "panImage", maxCount: 1 },
-    { name: "dlFrontImage", maxCount: 1 },
-    { name: "dlBackImage", maxCount: 1 }
-  ]),
-  updateDocuments
-);
-/**
- * @swagger
- * /api/profile/documents/update:
- *   put:
- *     tags:
  *       - Profile
  *     summary: Upload or update PAN and Driving License
  *     description: >
@@ -802,6 +663,159 @@ router.put(
  *                 message:
  *                   type: string
  *                   example: Manual PAN update not allowed yet
+ *
+ *       401:
+ *         description: Unauthorized
+ *
+ *       500:
+ *         description: Server error
+ */
+
+router.put(
+  "/documents/update",
+  riderAuthMiddleWare,        
+  upload.fields([
+    { name: "panImage", maxCount: 1 },
+    { name: "dlFrontImage", maxCount: 1 },
+    { name: "dlBackImage", maxCount: 1 }
+  ]),
+  updateDocuments
+);
+/**
+ * @swagger
+ * /api/rider/orders/history:
+ *   get:
+ *     tags:
+ *       - Profile
+ *     summary: Get rider delivered order history
+ *     description: >
+ *       Fetch delivered order history of the logged-in rider.
+ *       Supports multiple time-based filters.
+ *
+ *       **Filters**
+ *       - `all` → All delivered orders
+ *       - `daily` → Today’s delivered orders
+ *       - `weekly` → Last 7 days delivered orders
+ *       - `monthly` → Current month delivered orders
+ *
+ *     security:
+ *       - bearerAuth: []
+ *
+ *     parameters:
+ *       - in: query
+ *         name: filter
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [all, daily, weekly, monthly]
+ *           default: all
+ *         description: Filter order history by date range
+ *
+ *     responses:
+ *       200:
+ *         description: Rider order history fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 filter:
+ *                   type: string
+ *                   example: weekly
+ *                 totalOrders:
+ *                   type: integer
+ *                   example: 15
+ *                 totalEarnings:
+ *                   type: number
+ *                   example: 2450
+ *                 totalDistance:
+ *                   type: number
+ *                   example: 72.3
+ *                 avgRating:
+ *                   type: string
+ *                   example: "4.5"
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       orderId:
+ *                         type: string
+ *                         example: ORD-123456
+ *                       items:
+ *                         type: array
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             itemName:
+ *                               type: string
+ *                               example: Veg Burger
+ *                             quantity:
+ *                               type: integer
+ *                               example: 2
+ *                             price:
+ *                               type: number
+ *                               example: 120
+ *                             total:
+ *                               type: number
+ *                               example: 240
+ *                       pricing:
+ *                         type: object
+ *                         properties:
+ *                           itemTotal:
+ *                             type: number
+ *                             example: 240
+ *                           deliveryFee:
+ *                             type: number
+ *                             example: 40
+ *                           tax:
+ *                             type: number
+ *                             example: 12
+ *                           platformCommission:
+ *                             type: number
+ *                             example: 18
+ *                           totalAmount:
+ *                             type: number
+ *                             example: 310
+ *                       customerTip:
+ *                         type: number
+ *                         example: 20
+ *                       distanceTravelled:
+ *                         type: number
+ *                         example: 5.6
+ *                       durationInMin:
+ *                         type: number
+ *                         example: 28
+ *                       pickupAddress:
+ *                         type: string
+ *                         example: MG Road, Bengaluru
+ *                       deliveredAddress:
+ *                         type: string
+ *                         example: Whitefield, Bengaluru
+ *                       rating:
+ *                         type: number
+ *                         example: 5
+ *                       deliveredAt:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2026-01-07T10:15:00.000Z"
+ *
+ *       400:
+ *         description: Rider ID missing
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Rider ID missing
  *
  *       401:
  *         description: Unauthorized
