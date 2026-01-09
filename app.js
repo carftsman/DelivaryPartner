@@ -93,6 +93,11 @@ app.use("/api/earnings", require("./routes/earningsRoutes"));
 
 app.use("/api/orders", require("./routes/orderRoutes"));
 
+
+//liveTracking\
+
+app.use("/api/aerial",require("./routes/gpsRoutes"))
+
 app.get("/", (req, res) => {
   res.send("Vega Delivery Partner API Running. Open /api-docs");
 });

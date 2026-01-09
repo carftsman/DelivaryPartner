@@ -225,6 +225,7 @@ const RiderSchema = new Schema(
       aadharVerified: { type: Boolean, default: false },
       panUploaded: { type: Boolean, default: false },
       dlUploaded: { type: Boolean, default: false },
+       kycCompleted: { type: Boolean, default: false },
     },
  
     permissions: {
