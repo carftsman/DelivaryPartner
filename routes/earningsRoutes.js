@@ -1,79 +1,73 @@
 const express = require("express");
-const earningsRouter = express.Router()
+const router = express.Router();
 
 const {
-    getEarningsOrders,
-  getEarningOrderDetail,
   getMonthEarnings,
-  getWallet,
   getWeekEarnings,
   getDayEarnings,
+  getOrderEarningDetail,
   getEarningsSummary
 } = require("../controllers/earningsController");
 
-const {riderAuthMiddleWare} = require("../middleware/riderAuthMiddleware.js");  // rideruth
+const {riderAuthMiddleWare} = require("../middleware/riderAuthMiddleware");
 
-// console.log("riderAuth type:", typeof riderAuthMiddleWare);
-// console.log("getEarningsOrders type:", typeof getEarningsOrders);
 
+/* ORDER IS VERY IMPORTANT */
 
 /**
  * @swagger
- * /api/earnings/orders:
+ * /api/earnings/week:
  *   get:
  *     tags: [Earnings]
- *     summary: Get earnings orders list (today / week / month)
+ *     summary: Get week-wise earnings with day-wise orders
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
- *         name: type
+ *         name: start
+ *         required: true
  *         schema:
  *           type: string
- *           enum: [today, week, month]
- *         required: false
- *         description: Filter orders by time range
+ *           example: "2026-01-01"
+ *         description: Start date (YYYY-MM-DD)
+ *       - in: query
+ *         name: end
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "2026-01-07"
+ *         description: End date (YYYY-MM-DD)
  *     responses:
  *       200:
- *         description: Earnings orders fetched successfully
+ *         description: Week earnings fetched successfully
  *         content:
  *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 type:
- *                   type: string
- *                   example: today
- *                 totalEarnings:
- *                   type: number
- *                   example: 840
- *                 orders:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       orderId:
- *                         type: string
- *                         example: ORD123
- *                       amount:
- *                         type: number
- *                         example: 140
- *                       completedAt:
- *                         type: string
- *                         format: date-time
- *       401:
- *         description: Unauthorized
- *       500:
- *         description: Failed to fetch earnings orders
+ *             example:
+ *               from: "2026-01-01"
+ *               to: "2026-01-07"
+ *               totalOrders: 12
+ *               totalEarnings: 1680
+ *               days:
+ *                 - date: "2026-01-06"
+ *                   ordersCompleted: 1
+ *                   orders:
+ *                     - orderId: "ORD3005"
+ *                       completedAt: "2026-01-06T11:51:53.250Z"
+ *                       earnings:
+ *                         basePay: 35
+ *                         distancePay: 20
+ *                         surgePay: 5
+ *                         tips: 10
+ *                         total: 70
  */
-earningsRouter.get("/orders", riderAuthMiddleWare, getEarningsOrders);
+router.get("/week", riderAuthMiddleWare, getWeekEarnings);
 
 /**
  * @swagger
  * /api/earnings/orders/{orderId}:
  *   get:
  *     tags: [Earnings]
- *     summary: Get earnings details of a specific order
+ *     summary: Get earning details of a specific order
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -82,139 +76,102 @@ earningsRouter.get("/orders", riderAuthMiddleWare, getEarningsOrders);
  *         required: true
  *         schema:
  *           type: string
- *         description: Order ID
+ *           example: "ORD3005"
  *     responses:
  *       200:
- *         description: Order earnings detail fetched successfully
+ *         description: Order earnings fetched successfully
  *         content:
  *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 orderId:
- *                   type: string
- *                   example: ORD123
- *                 vendorShopName:
- *                   type: string
- *                   example: ABC Store
- *                 status:
- *                   type: string
- *                   example: COMPLETED
- *                 earnings:
- *                   type: object
- *                   properties:
- *                     deliveryAmount:
- *                       type: number
- *                       example: 120
- *                     peakHourBonus:
- *                       type: number
- *                       example: 20
- *                     taxAndOtherFees:
- *                       type: number
- *                       example: 5
- *                     totalEarnings:
- *                       type: number
- *                       example: 135
- *                 deliveredAt:
- *                   type: string
- *                   format: date-time
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: Order not found
- *       500:
- *         description: Failed to fetch order detail
+ *             example:
+ *               orderId: "ORD3005"
+ *               earnings:
+ *                 basePay: 35
+ *                 distancePay: 20
+ *                 surgePay: 5
+ *                 tips: 10
+ *                 total: 70
  */
-earningsRouter.get("/orders/:orderId", riderAuthMiddleWare, getEarningOrderDetail);
+router.get("/orders/:orderId", riderAuthMiddleWare, getOrderEarningDetail);
+
 
 /**
  * @swagger
- * /api/earnings/month:
+ * /api/earnings/{date}:
  *   get:
  *     tags: [Earnings]
- *     summary: Get current month total earnings
+ *     summary: Get day-wise earnings with orders and earning details
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: date
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "2026-01-06"
+ *         description: Date in YYYY-MM-DD format
+ *     responses:
+ *       200:
+ *         description: Day earnings fetched successfully
+ *         content:
+ *           application/json:
+ *             example:
+ *               date: "2026-01-06"
+ *               ordersCompleted: 1
+ *               orders:
+ *                 - orderId: "ORD3005"
+ *                   completedAt: "2026-01-06T11:51:53.250Z"
+ *                   earnings:
+ *                     basePay: 35
+ *                     distancePay: 20
+ *                     surgePay: 5
+ *                     tips: 10
+ *                     total: 70
+ */
+
+
+/**
+ * @swagger
+ * /api/earnings/{month}:
+ *   get:
+ *     tags: [Earnings]
+ *     summary: Get month-wise earnings with week-wise orders
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: month
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "jan"
+ *         description: Month short name (jan, feb, mar...)
  *     responses:
  *       200:
  *         description: Month earnings fetched successfully
  *         content:
  *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 monthEarnings:
- *                   type: number
- *                   example: 1360
- *       401:
- *         description: Unauthorized
- *       500:
- *         description: Failed to fetch month earnings
+ *             example:
+ *               from: "2026-01-01"
+ *               to: "2026-02-01"
+ *               totalOrders: 12
+ *               totalEarnings: 1680
+ *               weeks:
+ *                 - from: "2026-01-01"
+ *                   to: "2026-01-07"
+ *                   ordersCompleted: 12
+ *                   orders:
+ *                     - orderId: "ORD3005"
+ *                       completedAt: "2026-01-06T11:51:53.250Z"
+ *                       earnings:
+ *                         basePay: 35
+ *                         distancePay: 20
+ *                         surgePay: 5
+ *                         tips: 10
+ *                         total: 70
  */
 
-earningsRouter.get("/month",riderAuthMiddleWare,getMonthEarnings);
-
-/**
- * @swagger
- * /api/earnings/wallet:
- *   get:
- *     tags: [Earnings]
- *     summary: Get rider wallet details
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Wallet details fetched successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 balance:
- *                   type: number
- *                   example: 1200
- *                 totalEarned:
- *                   type: number
- *                   example: 5000
- *                 totalWithdrawn:
- *                   type: number
- *                   example: 3800
- *       401:
- *         description: Unauthorized
- *       500:
- *         description: Failed to fetch wallet
- */
-
-earningsRouter.get("/wallet",riderAuthMiddleWare,getWallet);
-
-/**
- * @swagger
- * /api/earnings/week:
- *   get:
- *     tags: [Earnings]
- *     summary: Get current week earnings (calculated from delivered orders)
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Week earnings fetched successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 weekEarnings:
- *                   type: number
- *                   example: 5400
- *       401:
- *         description: Unauthorized
- *       500:
- *         description: Failed to fetch week earnings
- */
-earningsRouter.get("/week",riderAuthMiddleWare,getWeekEarnings);
-
-
-
+router.get("/:param", riderAuthMiddleWare, getMonthEarnings, getDayEarnings);
 
 
 /**
@@ -222,7 +179,7 @@ earningsRouter.get("/week",riderAuthMiddleWare,getWeekEarnings);
  * /api/earnings/summary:
  *   get:
  *     tags: [Earnings]
- *     summary: Get today and month earnings summary
+ *     summary: Get earnings summary for dashboard (today, week, month)
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -230,110 +187,24 @@ earningsRouter.get("/week",riderAuthMiddleWare,getWeekEarnings);
  *         description: Earnings summary fetched successfully
  *         content:
  *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 todayEarnings:
- *                   type: number
- *                   example: 840
- *                 monthEarnings:
- *                   type: number
- *                   example: 1360
- *       401:
- *         description: Unauthorized
- *       500:
- *         description: Failed to fetch summary
- */
-earningsRouter.get("/summary",riderAuthMiddleWare,getEarningsSummary);
-
-/**
- * @swagger
- * /api/earnings/day:
- *   get:
- *     tags:
- *       - Earnings
- *     summary: Get rider day earnings summary
- *     description: >
- *       Fetch day-wise earnings summary for a rider.
- *       Data is fetched from EarningSummary collection.
- *       If date is not provided, today's earnings are returned.
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: date
- *         schema:
- *           type: string
- *           example: 2026-01-07
- *         required: false
- *         description: Date in YYYY-MM-DD format (optional, defaults to today)
- *     responses:
- *       200:
- *         description: Day earnings fetched successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 date:
- *                   type: string
- *                   example: 2026-01-07
- *                 ordersCompleted:
- *                   type: integer
- *                   example: 6
- *                 onlineMinutes:
- *                   type: integer
- *                   example: 240
- *                 earnings:
- *                   type: object
- *                   properties:
- *                     baseEarnings:
- *                       type: number
- *                       example: 600
- *                     incentiveEarnings:
- *                       type: number
- *                       example: 200
- *                     tipEarnings:
- *                       type: number
- *                       example: 40
- *                     penaltyAmount:
- *                       type: number
- *                       example: 0
- *                 totalEarnings:
- *                   type: number
- *                   example: 840
- *                 incentives:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       incentiveType:
- *                         type: string
- *                         example: PEAK_HOUR
- *                       minOrders:
- *                         type: integer
- *                         example: 6
- *                       completedOrders:
- *                         type: integer
- *                         example: 6
- *                       rewardType:
- *                         type: string
- *                         example: FIXED_AMOUNT
- *                       rewardValue:
- *                         type: number
- *                         example: 200
- *                       earnedAmount:
- *                         type: number
- *                         example: 200
- *                       status:
- *                         type: string
- *                         example: COMPLETED
- *       401:
- *         description: Unauthorized (invalid or missing token)
- *       500:
- *         description: Internal server error
+ *             example:
+ *               today:
+ *                 date: "2026-01-06"
+ *                 ordersCompleted: 1
+ *                 totalEarnings: 70
+ *               week:
+ *                 from: "2026-01-01"
+ *                 to: "2026-01-07"
+ *                 ordersCompleted: 12
+ *                 totalEarnings: 1680
+ *               month:
+ *                 from: "2026-01-01"
+ *                 to: "2026-01-31"
+ *                 ordersCompleted: 12
+ *                 totalEarnings: 1680
  */
 
-earningsRouter.get("/day", riderAuthMiddleWare, getDayEarnings);
+router.get("/summary", riderAuthMiddleWare, getEarningsSummary);
 
-module.exports = earningsRouter;
+
+module.exports = router;

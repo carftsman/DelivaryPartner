@@ -1,224 +1,203 @@
-// const mongoose = require("mongoose");
 // const Order = require("../models/OrderSchema");
 // const EarningSummary = require("../models/EarningSummary");
-// const Rider = require("../models/RiderModel");
 
-// /* ============================== HELPERS ============================== */
+// /* ===================== CONSTANTS ===================== */
 
-// const today = () => new Date().toISOString().slice(0, 10);
+// const MONTH_MAP = {
+//   jan: "01",
+//   feb: "02",
+//   mar: "03",
+//   apr: "04",
+//   may: "05",
+//   jun: "06",
+//   jul: "07",
+//   aug: "08",
+//   sep: "09",
+//   oct: "10",
+//   nov: "11",
+//   dec: "12"
+// };
 
-// const getDateRange = (type = "today") => {
-//   const start = new Date();
-//   const end = new Date();
+// const VALID_MONTHS = Object.keys(MONTH_MAP);
 
-//   if (type === "today") {
-//     start.setHours(0, 0, 0, 0);
-//     end.setHours(23, 59, 59, 999);
-//   }
+// /* ===================== HELPERS ===================== */
 
-//   if (type === "week") {
-//     const day = start.getDay() || 7;
-//     start.setDate(start.getDate() - day + 1);
-//     start.setHours(0, 0, 0, 0);
-
-//     end.setDate(start.getDate() + 6);
-//     end.setHours(23, 59, 59, 999);
-//   }
-
-//   if (type === "month") {
-//     start.setDate(1);
-//     start.setHours(0, 0, 0, 0);
-
-//     end.setMonth(start.getMonth() + 1, 0);
-//     end.setHours(23, 59, 59, 999);
-//   }
-
+// const getMonthDateRange = (year, monthNum) => {
+//   const start = `${year}-${monthNum}-01`;
+//   const endDate = new Date(start);
+//   endDate.setMonth(endDate.getMonth() + 1);
+//   const end = endDate.toISOString().slice(0, 10);
 //   return { start, end };
 // };
 
+// const isValidDate = (date) => /^\d{4}-\d{2}-\d{2}$/.test(date);
 
-
-// const getMonthEarnings = async (req, res) => {
-//   try {
-//     const riderId = req.rider._id;
-//     const { start, end } = getDateRange("month");
-
-//     const orders = await Order.find({
-//       riderId,
-//       orderStatus: "DELIVERED",
-//       createdAt: { $gte: start, $lte: end }
-//     })
-//       .select("orderId riderEarning createdAt")
-//       .sort({ createdAt: -1 })
-//       .lean();
-
-//     let totalEarnings = 0;
-
-//     const orderList = orders.map(o => {
-//       const amount = o?.riderEarning?.amount || 0;
-//       totalEarnings += amount;
-
-//       return {
-//         orderId: o.orderId,
-//         amount,
-//         completedAt: o.createdAt
-//       };
-//     });
-
-//     return res.json({
-//       range: "month",
-//       totalEarnings,
-//       totalOrders: orderList.length,
-//       orders: orderList
-//     });
-//   } catch (error) {
-//     console.error("getMonthEarnings error:", error);
-//     return res.status(500).json({ message: "Failed to fetch month earnings" });
-//   }
-// };
-
-
-
-// const getWeekEarnings = async (req, res) => {
-//   try {
-//     if (!req.rider?._id) {
-//       return res.status(401).json({ message: "Unauthorized" });
-//     }
-
-//     const riderId = req.rider._id;
-//     const { start, end } = getDateRange("week");
-
-//     const orders = await Order.find({
-//       riderId,
-//       orderStatus: "DELIVERED",
-//       createdAt: { $gte: start, $lte: end }
-//     })
-//       .select("orderId riderEarning createdAt")
-//       .sort({ createdAt: -1 })
-//       .lean();
-
-//     let totalEarnings = 0;
-
-//     const orderList = orders.map(o => {
-//       const amount = o?.riderEarning?.amount || 0;
-//       totalEarnings += amount;
-
-//       return {
-//         orderId: o.orderId,
-//         amount,
-//         completedAt: o.createdAt
-//       };
-//     });
-
-//     return res.json({
-//       range: "week",
-//       totalEarnings,
-//       totalOrders: orderList.length,
-//       orders: orderList
-//     });
-//   } catch (error) {
-//     console.error("getWeekEarnings error:", error);
-//     return res.status(500).json({ message: "Failed to fetch week earnings" });
-//   }
-// };
-
-
-// const getEarningsSummary = async (req, res) => {
-//   try {
-//     if (!req.rider || !req.rider._id) {
-//       return res.status(401).json({ message: "Unauthorized" });
-//     }
-
-//     const riderId = new mongoose.Types.ObjectId(req.rider._id);
-//     const todayDate = today();
-//     const monthStart = todayDate.slice(0, 7) + "-01";
-
-//     const todayData = await EarningSummary.findOne(
-//       { riderId, date: todayDate },
-//       { totalEarnings: 1 }
-//     ).lean();
-
-//     const monthAgg = await EarningSummary.aggregate([
-//       { $match: { riderId, date: { $gte: monthStart } } },
-//       { $group: { _id: null, total: { $sum: "$totalEarnings" } } }
-//     ]);
-
-//     return res.json({
-//       todayEarnings: todayData?.totalEarnings || 0,
-//       monthEarnings: monthAgg[0]?.total || 0
-//     });
-//   } catch (error) {
-//     console.error("getEarningsSummary error:", error);
-//     return res.status(500).json({ message: "Failed to fetch summary" });
-//   }
-// };
-
-// /* ====================== WALLET ====================== */
+// /* ===================== MONTH ===================== */
 // /**
-//  * GET /api/earnings/wallet
+//  * GET /api/earnings/jan
 //  */
-// const getWallet = async (req, res) => {
+// const getMonthEarnings = async (req, res, next) => {
 //   try {
-//     if (!req.rider?._id) {
-//       return res.status(401).json({ message: "Unauthorized" });
+//     const monthKey = req.params.param.toLowerCase();
+
+//     if (!VALID_MONTHS.includes(monthKey)) {
+//       return next(); // not month → go to next route
 //     }
 
-//     const rider = await Rider.findById(req.rider._id).select("wallet");
+//     const riderId = req.rider._id;
+//     const year = new Date().getFullYear();
+//     const { start, end } = getMonthDateRange(year, MONTH_MAP[monthKey]);
+
+//     const summaries = await EarningSummary.find({
+//       riderId,
+//       date: { $gte: start, $lt: end }
+//     })
+//       .sort({ date: 1 })
+//       .lean();
+
+//     let totalOrders = 0;
+//     let totalEarnings = 0;
+//     const weeks = [];
+
+//     let currentWeek = null;
+
+//     summaries.forEach(day => {
+//       const d = new Date(day.date);
+//       const weekStart = new Date(d);
+//       weekStart.setDate(d.getDate() - d.getDay());
+//       const weekKey = weekStart.toISOString().slice(0, 10);
+
+//       if (!currentWeek || currentWeek.from !== weekKey) {
+//         currentWeek = {
+//           from: weekKey,
+//           to: day.date,
+//           ordersCompleted: 0,
+//           totalEarnings: 0
+//         };
+//         weeks.push(currentWeek);
+//       }
+
+//       currentWeek.to = day.date;
+//       currentWeek.ordersCompleted += day.ordersCompleted;
+//       currentWeek.totalEarnings += day.totalEarnings;
+
+//       totalOrders += day.ordersCompleted;
+//       totalEarnings += day.totalEarnings;
+//     });
 
 //     res.json({
-//       balance: rider?.wallet?.balance || 0,
-//       totalEarned: rider?.wallet?.totalEarned || 0,
-//       totalWithdrawn: rider?.wallet?.totalWithdrawn || 0
+//       from: start,
+//       to: end,
+//       totalOrders,
+//       totalEarnings,
+//       weeks
 //     });
-//   } catch (error) {
-//     console.error("getWallet:", error);
-//     res.status(500).json({ message: "Failed to fetch wallet" });
+//   } catch (err) {
+//     console.error("getMonthEarnings", err);
+//     res.status(500).json({ message: "Failed to fetch month earnings" });
 //   }
 // };
 
-// /* ====================== EARNINGS LIST ====================== */
+// /* ===================== WEEK ===================== */
 // /**
-//  * GET /api/earnings/orders
+//  * GET /api/earnings/week?start=YYYY-MM-DD&end=YYYY-MM-DD
 //  */
-// const getEarningsOrders = async (req, res) => {
+// const getWeekEarnings = async (req, res) => {
 //   try {
 //     const riderId = req.rider._id;
-//     const type = req.query.type || "today";
-//     const { start, end } = getDateRange(type);
+//     const { start, end } = req.query;
+
+//     if (!isValidDate(start) || !isValidDate(end)) {
+//       return res.status(400).json({ message: "Invalid date range" });
+//     }
+
+//     const summaries = await EarningSummary.find({
+//       riderId,
+//       date: { $gte: start, $lte: end }
+//     })
+//       .sort({ date: 1 })
+//       .lean();
+
+//     let totalOrders = 0;
+//     let totalEarnings = 0;
+
+//     const days = summaries.map(day => {
+//       totalOrders += day.ordersCompleted;
+//       totalEarnings += day.totalEarnings;
+
+//       return {
+//         date: day.date,
+//         ordersCompleted: day.ordersCompleted
+//       };
+//     });
+
+//     res.json({
+//       from: start,
+//       to: end,
+//       totalOrders,
+//       totalEarnings,
+//       days
+//     });
+//   } catch (err) {
+//     console.error("getWeekEarnings", err);
+//     res.status(500).json({ message: "Failed to fetch week earnings" });
+//   }
+// };
+
+// /* ===================== DAY ===================== */
+// /**
+//  * GET /api/earnings/2026-01-07
+//  */
+// const getDayEarnings = async (req, res, next) => {
+//   try {
+//     const date = req.params.param;
+
+//     if (!isValidDate(date)) {
+//       return next(); // not a date → maybe month
+//     }
+
+//     const riderId = req.rider._id;
+
+//     const summary = await EarningSummary.findOne({
+//       riderId,
+//       date
+//     }).lean();
+
+//     if (!summary) {
+//       return res.json({
+//         date,
+//         ordersCompleted: 0,
+//         orders: []
+//       });
+//     }
 
 //     const orders = await Order.find({
 //       riderId,
 //       orderStatus: "DELIVERED",
-//       createdAt: { $gte: start, $lte: end }
+//       createdAt: {
+//         $gte: new Date(`${date}T00:00:00.000Z`),
+//         $lte: new Date(`${date}T23:59:59.999Z`)
+//       }
 //     })
-//       .select("orderId riderEarning createdAt")
-//       .sort({ createdAt: -1 })
+//       .select("orderId")
 //       .lean();
 
-//     let totalEarnings = 0;
-
-//     const result = orders.map(o => {
-//       const amount = o?.riderEarning?.amount || 0;
-//       totalEarnings += amount;
-
-//       return {
-//         orderId: o.orderId,
-//         amount,
-//         completedAt: o.createdAt
-//       };
+//     res.json({
+//       date,
+//       ordersCompleted: summary.ordersCompleted,
+//       orders: orders.map(o => o.orderId)
 //     });
-
-//     res.json({ type, totalEarnings, orders: result });
 //   } catch (err) {
-//     res.status(500).json({ message: "Failed to fetch earnings" });
+//     console.error("getDayEarnings", err);
+//     res.status(500).json({ message: "Failed to fetch day earnings" });
 //   }
 // };
 
-// /* ====================== EARNINGS DETAIL ====================== */
+// /* ===================== ORDER DETAIL ===================== */
 // /**
 //  * GET /api/earnings/orders/:orderId
 //  */
-// const getEarningOrderDetail = async (req, res) => {
+// const getOrderEarningDetail = async (req, res) => {
 //   try {
 //     const order = await Order.findOne({
 //       riderId: req.rider._id,
@@ -227,343 +206,999 @@
 //     }).lean();
 
 //     if (!order) {
-//       return res.status(404).json({
-//         message: "Order not found or not completed"
-//       });
+//       return res.status(404).json({ message: "Order not found" });
 //     }
 
-//     const deliveryAmount = order?.riderEarning?.amount || 0;
-//     const peakHourBonus = order?.peakHourBonus || 0;
-//     const tax = order?.pricing?.tax || 0;
+//     const e = order.riderEarning || {};
 
 //     res.json({
 //       orderId: order.orderId,
-//       vendorShopName: order.vendorShopName,
-//       status: "COMPLETED",
 //       earnings: {
-//         deliveryAmount,
-//         peakHourBonus,
-//         taxAndOtherFees: tax,
-//         totalEarnings: deliveryAmount + peakHourBonus - tax
-//       },
-//       deliveryDetails: {
-//         distanceInKm: order?.tracking?.distanceInKm || 0,
-//         durationInMin: order?.tracking?.durationInMin || 0
-//       },
-//       deliveredAt: order.updatedAt
+//         basePay: e.basePay || 0,
+//         distancePay: e.distancePay || 0,
+//         surgePay: e.surgePay || 0,
+//         tips: e.tips || 0,
+//         total:
+//           (e.basePay || 0) +
+//           (e.distancePay || 0) +
+//           (e.surgePay || 0) +
+//           (e.tips || 0)
+//       }
 //     });
 //   } catch (err) {
-//     res.status(500).json({ message: "Failed to fetch order detail" });
+//     console.error("getOrderEarningDetail", err);
+//     res.status(500).json({ message: "Failed to fetch order earnings" });
 //   }
 // };
 
-// const getDayEarnings = async (req, res) => {
+// module.exports = {
+//   getMonthEarnings,
+//   getWeekEarnings,
+//   getDayEarnings,
+//   getOrderEarningDetail
+// };
+
+// const Order = require("../models/OrderSchema");
+// const EarningSummary = require("../models/EarningSummary");
+
+// /* ===================== CONSTANTS ===================== */
+
+// const MONTH_MAP = {
+//   jan: "01", feb: "02", mar: "03", apr: "04",
+//   may: "05", jun: "06", jul: "07", aug: "08",
+//   sep: "09", oct: "10", nov: "11", dec: "12"
+// };
+
+// const VALID_MONTHS = Object.keys(MONTH_MAP);
+
+// /* ===================== HELPERS ===================== */
+
+// const isValidDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
+
+// const getDayRange = (date) => {
+//   const start = new Date(date);
+//   start.setHours(0, 0, 0, 0);
+
+//   const end = new Date(date);
+//   end.setHours(23, 59, 59, 999);
+
+//   return { start, end };
+// };
+
+// const getMonthRange = (year, month) => {
+//   const start = `${year}-${month}-01`;
+//   const d = new Date(start);
+//   d.setMonth(d.getMonth() + 1);
+//   const end = d.toISOString().slice(0, 10);
+//   return { start, end };
+// };
+
+// /* ===================== MONTH ===================== */
+// /**
+//  * GET /api/earnings/jan
+//  */
+// const getMonthEarnings = async (req, res, next) => {
 //   try {
-//     if (!req.rider?._id) {
-//       return res.status(401).json({ message: "Unauthorized" });
+//     const key = req.params.param.toLowerCase();
+//     if (!VALID_MONTHS.includes(key)) return next();
+
+//     const riderId = req.rider._id;
+//     const year = new Date().getFullYear();
+//     const { start, end } = getMonthRange(year, MONTH_MAP[key]);
+
+//     const summaries = await EarningSummary.find({
+//       riderId,
+//       date: { $gte: start, $lt: end }
+//     }).sort({ date: 1 }).lean();
+
+//     const orders = await Order.find({
+//       riderId,
+//       orderStatus: "DELIVERED",
+//       createdAt: { $gte: new Date(start), $lt: new Date(end) }
+//     })
+//       .select("orderId createdAt")
+//       .lean();
+
+//     let totalOrders = 0;
+//     let totalEarnings = 0;
+//     const weeks = [];
+
+//     let currentWeek = null;
+
+//     summaries.forEach(day => {
+//       const d = new Date(day.date);
+//       let weekStart = new Date(d);
+//       weekStart.setDate(d.getDate() - d.getDay());
+//       if (weekStart < new Date(start)) weekStart = new Date(start);
+
+//       const weekKey = weekStart.toISOString().slice(0, 10);
+
+//       if (!currentWeek || currentWeek.from !== weekKey) {
+//         currentWeek = {
+//           from: weekKey,
+//           to: day.date,
+//           ordersCompleted: 0,
+//           totalEarnings: 0,
+//           orders: []
+//         };
+//         weeks.push(currentWeek);
+//       }
+
+//       currentWeek.to = day.date;
+//       currentWeek.ordersCompleted += day.ordersCompleted;
+//       currentWeek.totalEarnings += day.totalEarnings;
+
+//       totalOrders += day.ordersCompleted;
+//       totalEarnings += day.totalEarnings;
+//     });
+
+//     orders.forEach(o => {
+//       const od = o.createdAt.toISOString().slice(0, 10);
+//       const week = weeks.find(w => od >= w.from && od <= w.to);
+//       if (week) week.orders.push(o.orderId);
+//     });
+
+//     res.json({
+//       from: start,
+//       to: end,
+//       totalOrders,
+//       totalEarnings,
+//       weeks
+//     });
+//   } catch (err) {
+//     console.error("getMonthEarnings", err);
+//     res.status(500).json({ message: "Failed to fetch month earnings" });
+//   }
+// };
+
+// /* ===================== WEEK ===================== */
+// /**
+//  * GET /api/earnings/week?start=YYYY-MM-DD&end=YYYY-MM-DD
+//  */
+// const getWeekEarnings = async (req, res) => {
+//   try {
+//     const { start, end } = req.query;
+//     if (!isValidDate(start) || !isValidDate(end)) {
+//       return res.status(400).json({ message: "Invalid date range" });
 //     }
 
 //     const riderId = req.rider._id;
 
-//     // date from query OR default today
-//     const dateParam = req.query.date; // YYYY-MM-DD
-//     const targetDate = dateParam
-//       ? new Date(dateParam)
-//       : new Date();
+//     const summaries = await EarningSummary.find({
+//       riderId,
+//       date: { $gte: start, $lte: end }
+//     }).sort({ date: 1 }).lean();
 
-//     // start & end of the day
-//     const start = new Date(targetDate);
-//     start.setHours(0, 0, 0, 0);
+//     const days = [];
 
-//     const end = new Date(targetDate);
-//     end.setHours(23, 59, 59, 999);
+//     summaries.forEach(d => {
+//       days.push({
+//         date: d.date,
+//         ordersCompleted: d.ordersCompleted,
+//         orders: []
+//       });
+//     });
+
+//     const orders = await Order.find({
+//       riderId,
+//       orderStatus: "DELIVERED",
+//       createdAt: {
+//         $gte: new Date(`${start}T00:00:00`),
+//         $lte: new Date(`${end}T23:59:59`)
+//       }
+//     })
+//       .select("orderId createdAt")
+//       .lean();
+
+//     orders.forEach(o => {
+//       const d = o.createdAt.toISOString().slice(0, 10);
+//       const day = days.find(x => x.date === d);
+//       if (day) day.orders.push(o.orderId);
+//     });
+
+//     const totalOrders = days.reduce((s, d) => s + d.ordersCompleted, 0);
+//     const totalEarnings = summaries.reduce((s, d) => s + d.totalEarnings, 0);
+
+//     res.json({
+//       from: start,
+//       to: end,
+//       totalOrders,
+//       totalEarnings,
+//       days
+//     });
+//   } catch (err) {
+//     console.error("getWeekEarnings", err);
+//     res.status(500).json({ message: "Failed to fetch week earnings" });
+//   }
+// };
+
+// /* ===================== DAY ===================== */
+// /**
+//  * GET /api/earnings/2026-01-07
+//  */
+// const getDayEarnings = async (req, res, next) => {
+//   try {
+//     const date = req.params.param;
+//     if (!isValidDate(date)) return next();
+
+//     const riderId = req.rider._id;
+//     const summary = await EarningSummary.findOne({ riderId, date }).lean();
+//     const { start, end } = getDayRange(date);
 
 //     const orders = await Order.find({
 //       riderId,
 //       orderStatus: "DELIVERED",
 //       createdAt: { $gte: start, $lte: end }
 //     })
-//       .select("orderId riderEarning createdAt")
-//       .sort({ createdAt: -1 })
+//       .select("orderId")
 //       .lean();
 
-//     let totalEarnings = 0;
-
-//     const orderList = orders.map(order => {
-//       const amount = order?.riderEarning?.amount || 0;
-//       totalEarnings += amount;
-
-//       return {
-//         orderId: order.orderId,
-//         amount,
-//         completedAt: order.createdAt
-//       };
+//     res.json({
+//       date,
+//       ordersCompleted: summary?.ordersCompleted || orders.length,
+//       orders: orders.map(o => o.orderId)
 //     });
+//   } catch (err) {
+//     console.error("getDayEarnings", err);
+//     res.status(500).json({ message: "Failed to fetch day earnings" });
+//   }
+// };
 
-//     return res.json({
-//       date: start.toISOString().slice(0, 10),
-//       totalEarnings,
-//       totalOrders: orderList.length,
-//       orders: orderList
+// /* ===================== ORDER DETAIL ===================== */
+// /**
+//  * GET /api/earnings/orders/:orderId
+//  */
+// const getOrderEarningDetail = async (req, res) => {
+//   try {
+//     const order = await Order.findOne({
+//       riderId: req.rider._id,
+//       orderId: req.params.orderId,
+//       orderStatus: "DELIVERED"
+//     }).lean();
+
+//     if (!order) {
+//       return res.status(404).json({ message: "Order not found" });
+//     }
+
+//     const e = order.riderEarning || {};
+
+//     res.json({
+//       orderId: order.orderId,
+//       earnings: {
+//         basePay: e.basePay || 0,
+//         distancePay: e.distancePay || 0,
+//         surgePay: e.surgePay || 0,
+//         tips: e.tips || 0,
+//         total:
+//           (e.basePay || 0) +
+//           (e.distancePay || 0) +
+//           (e.surgePay || 0) +
+//           (e.tips || 0)
+//       }
 //     });
-//   } catch (error) {
-//     console.error("getDayEarnings error:", error);
-//     return res.status(500).json({
-//       message: "Failed to fetch day earnings"
+//   } catch (err) {
+//     res.status(500).json({ message: "Failed to fetch order earnings" });
+//   }
+// };
+
+// const getEarningsSummary = async (req, res) => {
+//   try {
+//     const riderId = req.rider._id;
+//     const today = new Date().toISOString().slice(0, 10);
+//     const monthStart = today.slice(0, 7) + "-01";
+
+//     const todaySummary = await EarningSummary.findOne(
+//       { riderId, date: today },
+//       { totalEarnings: 1 }
+//     ).lean();
+
+//     const monthAgg = await EarningSummary.aggregate([
+//       { $match: { riderId, date: { $gte: monthStart } } },
+//       { $group: { _id: null, total: { $sum: "$totalEarnings" } } }
+//     ]);
+
+//     res.json({
+//       todayEarnings: todaySummary?.totalEarnings || 0,
+//       monthEarnings: monthAgg[0]?.total || 0
 //     });
+//   } catch (err) {
+//     res.status(500).json({ message: "Failed to fetch earnings summary" });
 //   }
 // };
 
 
 // module.exports = {
-//   getEarningsOrders,
-//   getEarningOrderDetail,
 //   getMonthEarnings,
-//   getEarningsSummary,
-//   getWallet,
 //   getWeekEarnings,
-//   getDayEarnings
+//   getDayEarnings,
+//   getOrderEarningDetail,
+//   getEarningsSummary
 // };
 
 
-const mongoose = require("mongoose");
+// const Order = require("../models/OrderSchema");
+// const EarningSummary = require("../models/EarningSummary");
+
+// /* ===================== CONSTANTS ===================== */
+
+// const MONTH_MAP = {
+//   jan: "01", feb: "02", mar: "03", apr: "04",
+//   may: "05", jun: "06", jul: "07", aug: "08",
+//   sep: "09", oct: "10", nov: "11", dec: "12"
+// };
+
+// const VALID_MONTHS = Object.keys(MONTH_MAP);
+
+// /* ===================== HELPERS ===================== */
+
+// const isValidDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
+
+// const getMonthRange = (year, month) => {
+//   const start = `${year}-${month}-01`;
+//   const d = new Date(start);
+//   d.setMonth(d.getMonth() + 1);
+//   const end = d.toISOString().slice(0, 10);
+//   return { start, end };
+// };
+
+// /* ===================== MONTH ===================== */
+// /**
+//  * GET /api/earnings/jan
+//  * Shows: weeks + orders
+//  */
+// const getMonthEarnings = async (req, res, next) => {
+//   try {
+//     const key = req.params.param.toLowerCase();
+//     if (!VALID_MONTHS.includes(key)) return next();
+
+//     const riderId = req.rider._id;
+//     const year = new Date().getFullYear();
+//     const { start, end } = getMonthRange(year, MONTH_MAP[key]);
+
+//     // ---- summaries (for totals) ----
+//     const summaries = await EarningSummary.find({
+//       riderId,
+//       date: { $gte: start, $lt: end }
+//     }).sort({ date: 1 }).lean();
+
+//     // ---- orders (DATE STRING MATCH - SAFE) ----
+//     const orders = await Order.find({
+//       riderId,
+//       orderStatus: "DELIVERED",
+//       $expr: {
+//         $and: [
+//           {
+//             $gte: [
+//               { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+//               start
+//             ]
+//           },
+//           {
+//             $lt: [
+//               { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+//               end
+//             ]
+//           }
+//         ]
+//       }
+//     })
+//       .select("orderId createdAt")
+//       .lean();
+
+//     let totalOrders = 0;
+//     let totalEarnings = 0;
+//     const weeks = [];
+//     let currentWeek = null;
+
+//     summaries.forEach(day => {
+//       const d = new Date(day.date);
+//       let weekStart = new Date(d);
+//       weekStart.setDate(d.getDate() - d.getDay());
+
+//       const monthStart = new Date(start);
+//       if (weekStart < monthStart) weekStart = monthStart;
+
+//       const weekKey = weekStart.toISOString().slice(0, 10);
+
+//       if (!currentWeek || currentWeek.from !== weekKey) {
+//         currentWeek = {
+//           from: weekKey,
+//           to: day.date,
+//           ordersCompleted: 0,
+//           totalEarnings: 0,
+//           orders: []
+//         };
+//         weeks.push(currentWeek);
+//       }
+
+//       currentWeek.to = day.date;
+//       currentWeek.ordersCompleted += day.ordersCompleted;
+//       currentWeek.totalEarnings += day.totalEarnings;
+
+//       totalOrders += day.ordersCompleted;
+//       totalEarnings += day.totalEarnings;
+//     });
+
+//     // attach orders into correct week
+//     orders.forEach(o => {
+//       const od = o.createdAt.toISOString().slice(0, 10);
+//       const week = weeks.find(w => od >= w.from && od <= w.to);
+//       if (week) week.orders.push(o.orderId);
+//     });
+
+//     res.json({
+//       from: start,
+//       to: end,
+//       totalOrders,
+//       totalEarnings,
+//       weeks
+//     });
+//   } catch (err) {
+//     console.error("getMonthEarnings", err);
+//     res.status(500).json({ message: "Failed to fetch month earnings" });
+//   }
+// };
+
+// /* ===================== WEEK ===================== */
+// /**
+//  * GET /api/earnings/week?start=YYYY-MM-DD&end=YYYY-MM-DD
+//  * Shows: days + orders
+//  */
+// const getWeekEarnings = async (req, res) => {
+//   try {
+//     const { start, end } = req.query;
+//     if (!isValidDate(start) || !isValidDate(end)) {
+//       return res.status(400).json({ message: "Invalid date range" });
+//     }
+
+//     const riderId = req.rider._id;
+
+//     const summaries = await EarningSummary.find({
+//       riderId,
+//       date: { $gte: start, $lte: end }
+//     }).sort({ date: 1 }).lean();
+
+//     const days = summaries.map(d => ({
+//       date: d.date,
+//       ordersCompleted: d.ordersCompleted,
+//       orders: []
+//     }));
+
+//     const orders = await Order.find({
+//       riderId,
+//       orderStatus: "DELIVERED",
+//       $expr: {
+//         $and: [
+//           {
+//             $gte: [
+//               { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+//               start
+//             ]
+//           },
+//           {
+//             $lte: [
+//               { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+//               end
+//             ]
+//           }
+//         ]
+//       }
+//     })
+//       .select("orderId createdAt")
+//       .lean();
+
+//     orders.forEach(o => {
+//       const d = o.createdAt.toISOString().slice(0, 10);
+//       const day = days.find(x => x.date === d);
+//       if (day) day.orders.push(o.orderId);
+//     });
+
+//     const totalOrders = summaries.reduce((s, d) => s + d.ordersCompleted, 0);
+//     const totalEarnings = summaries.reduce((s, d) => s + d.totalEarnings, 0);
+
+//     res.json({
+//       from: start,
+//       to: end,
+//       totalOrders,
+//       totalEarnings,
+//       days
+//     });
+//   } catch (err) {
+//     console.error("getWeekEarnings", err);
+//     res.status(500).json({ message: "Failed to fetch week earnings" });
+//   }
+// };
+
+// /* ===================== DAY ===================== */
+// /**
+//  * GET /api/earnings/2026-01-07
+//  * Shows: orders only
+//  */
+// const getDayEarnings = async (req, res, next) => {
+//   try {
+//     const date = req.params.param;
+//     if (!isValidDate(date)) return next();
+
+//     const riderId = req.rider._id;
+
+//     const summary = await EarningSummary.findOne({ riderId, date }).lean();
+
+//     const orders = await Order.find({
+//       riderId,
+//       orderStatus: "DELIVERED",
+//       $expr: {
+//         $eq: [
+//           { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+//           date
+//         ]
+//       }
+//     })
+//       .select("orderId")
+//       .lean();
+
+//     res.json({
+//       date,
+//       ordersCompleted: summary?.ordersCompleted || orders.length,
+//       orders: orders.map(o => o.orderId)
+//     });
+//   } catch (err) {
+//     console.error("getDayEarnings", err);
+//     res.status(500).json({ message: "Failed to fetch day earnings" });
+//   }
+// };
+
+// /* ===================== ORDER DETAIL ===================== */
+// /**
+//  * GET /api/earnings/orders/:orderId
+//  * Shows: earnings breakup
+//  */
+// const getOrderEarningDetail = async (req, res) => {
+//   try {
+//     const order = await Order.findOne({
+//       riderId: req.rider._id,
+//       orderId: req.params.orderId,
+//       orderStatus: "DELIVERED"
+//     }).lean();
+
+//     if (!order) {
+//       return res.status(404).json({ message: "Order not found" });
+//     }
+
+//     const e = order.riderEarning || {};
+
+//     res.json({
+//       orderId: order.orderId,
+//       earnings: {
+//         basePay: e.basePay || 0,
+//         distancePay: e.distancePay || 0,
+//         surgePay: e.surgePay || 0,
+//         tips: e.tips || 0,
+//         total:
+//           (e.basePay || 0) +
+//           (e.distancePay || 0) +
+//           (e.surgePay || 0) +
+//           (e.tips || 0)
+//       }
+//     });
+//   } catch (err) {
+//     console.error("getOrderEarningDetail", err);
+//     res.status(500).json({ message: "Failed to fetch order earnings" });
+//   }
+// };
+
+// const getEarningsSummary = async (req, res) => {
+//   try {
+//     const riderId = req.rider._id;
+
+//     const today = new Date().toISOString().slice(0, 10);
+
+//     // ----- TODAY -----
+//     const todaySummary = await EarningSummary.findOne(
+//       { riderId, date: today },
+//       { ordersCompleted: 1, totalEarnings: 1 }
+//     ).lean();
+
+//     // ----- WEEK (Mon → Sun) -----
+//     const now = new Date();
+//     const day = now.getDay() || 7;
+
+//     const weekStart = new Date(now);
+//     weekStart.setDate(now.getDate() - day + 1);
+//     weekStart.setHours(0, 0, 0, 0);
+
+//     const weekEnd = new Date(weekStart);
+//     weekEnd.setDate(weekStart.getDate() + 6);
+//     weekEnd.setHours(23, 59, 59, 999);
+
+//     const weekStartStr = weekStart.toISOString().slice(0, 10);
+//     const weekEndStr = weekEnd.toISOString().slice(0, 10);
+
+//     const weekAgg = await EarningSummary.aggregate([
+//       {
+//         $match: {
+//           riderId,
+//           date: { $gte: weekStartStr, $lte: weekEndStr }
+//         }
+//       },
+//       {
+//         $group: {
+//           _id: null,
+//           ordersCompleted: { $sum: "$ordersCompleted" },
+//           totalEarnings: { $sum: "$totalEarnings" }
+//         }
+//       }
+//     ]);
+
+//     // ----- MONTH -----
+//     const monthStart = today.slice(0, 7) + "-01";
+
+//     const monthAgg = await EarningSummary.aggregate([
+//       {
+//         $match: {
+//           riderId,
+//           date: { $gte: monthStart }
+//         }
+//       },
+//       {
+//         $group: {
+//           _id: null,
+//           ordersCompleted: { $sum: "$ordersCompleted" },
+//           totalEarnings: { $sum: "$totalEarnings" }
+//         }
+//       }
+//     ]);
+
+//     res.json({
+//       today: {
+//         date: today,
+//         ordersCompleted: todaySummary?.ordersCompleted || 0,
+//         totalEarnings: todaySummary?.totalEarnings || 0
+//       },
+//       week: {
+//         from: weekStartStr,
+//         to: weekEndStr,
+//         ordersCompleted: weekAgg[0]?.ordersCompleted || 0,
+//         totalEarnings: weekAgg[0]?.totalEarnings || 0
+//       },
+//       month: {
+//         from: monthStart,
+//         to: today.slice(0, 7) + "-31",
+//         ordersCompleted: monthAgg[0]?.ordersCompleted || 0,
+//         totalEarnings: monthAgg[0]?.totalEarnings || 0
+//       }
+//     });
+//   } catch (err) {
+//     console.error("getEarningsSummary", err);
+//     res.status(500).json({ message: "Failed to fetch earnings summary" });
+//   }
+// };
+
+
+// module.exports = {
+//   getMonthEarnings,
+//   getWeekEarnings,
+//   getDayEarnings,
+//   getOrderEarningDetail,
+//   getEarningsSummary
+// };
+
 const Order = require("../models/OrderSchema");
 const EarningSummary = require("../models/EarningSummary");
-const Rider = require("../models/RiderModel");
 
-/* ============================== HELPERS ============================== */
+/* ===================== CONSTANTS ===================== */
 
-const today = () => new Date().toISOString().slice(0, 10);
+const MONTH_MAP = {
+  jan: "01", feb: "02", mar: "03", apr: "04",
+  may: "05", jun: "06", jul: "07", aug: "08",
+  sep: "09", oct: "10", nov: "11", dec: "12"
+};
 
-const getDateRange = (type = "today", dateParam) => {
-  const start = new Date();
-  const end = new Date();
-  console.log(start)
-  if (type === "day" || type === "today") {
-    const target = dateParam ? new Date(dateParam) : new Date();
-    
-    start.setTime(target.getTime());
-    start.setHours(0, 0, 0, 0);
+const VALID_MONTHS = Object.keys(MONTH_MAP);
 
+/* ===================== HELPERS ===================== */
 
-    end.setTime(target.getTime());
-    end.setHours(23, 59, 59, 999);
+const isValidDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
 
-        console.log(target , "    helo   ", start   , "  ", end)
-
-  }
-
-  if (type === "week") {
-    const day = start.getDay() || 7;
-    start.setDate(start.getDate() - day + 1);
-    start.setHours(0, 0, 0, 0);
-
-    end.setDate(start.getDate() + 6);
-    end.setHours(23, 59, 59, 999);
-  }
-
-  if (type === "month") {
-    start.setDate(1);
-    start.setHours(0, 0, 0, 0);
-
-    end.setMonth(start.getMonth() + 1, 0);
-    end.setHours(23, 59, 59, 999);
-  }
-
+const getMonthRange = (year, month) => {
+  const start = `${year}-${month}-01`;
+  const d = new Date(start);
+  d.setMonth(d.getMonth() + 1);
+  const end = d.toISOString().slice(0, 10);
   return { start, end };
 };
 
-const calculateRiderEarnings = (riderEarning = {}) => {
-  const basePay = riderEarning.basePay || 0;
-  const distancePay = riderEarning.distancePay || 0;
-  const surgePay = riderEarning.surgePay || 0;
-  const tips = riderEarning.tips || 0;
-
+const mapOrderWithEarnings = (order) => {
+  const e = order.riderEarning || {};
   return {
-    basePay,
-    distancePay,
-    surgePay,
-    tips,
-    total: basePay + distancePay + surgePay + tips
+    orderId: order.orderId,
+    completedAt: order.createdAt,
+    earnings: {
+      basePay: e.basePay || 0,
+      distancePay: e.distancePay || 0,
+      surgePay: e.surgePay || 0,
+      tips: e.tips || 0,
+      total:
+        (e.basePay || 0) +
+        (e.distancePay || 0) +
+        (e.surgePay || 0) +
+        (e.tips || 0)
+    }
   };
 };
 
-/* ====================== DAY EARNINGS ====================== */
-/**
- * GET /api/earnings/day?date=YYYY-MM-DD
- */
-const getDayEarnings = async (req, res) => {
+
+const getDayEarnings = async (req, res, next) => {
   try {
-    if (!req.rider?._id) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
+    const date = req.params.param;
+    if (!isValidDate(date)) return next();
 
     const riderId = req.rider._id;
-    const date = req.query.date || new Date().toISOString().slice(0, 10);
 
-    const daySummary = await EarningSummary.findOne({
+    const orders = await Order.find({
       riderId,
-      date
+      orderStatus: "DELIVERED",
+      $expr: {
+        $eq: [
+          { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+          date
+        ]
+      }
     }).lean();
 
-    if (!daySummary) {
-      return res.json({
-        date,
-        totalEarnings: 0,
-        ordersCompleted: 0,
-        earnings: {
-          baseEarnings: 0,
-          incentiveEarnings: 0,
-          tipEarnings: 0,
-          penaltyAmount: 0
-        }
-      });
-    }
+    const summary = await EarningSummary.findOne({ riderId, date }).lean();
 
     res.json({
-      date: daySummary.date,
-      ordersCompleted: daySummary.ordersCompleted,
-      onlineMinutes: daySummary.onlineMinutes,
-      earnings: {
-        baseEarnings: daySummary.baseEarnings,
-        incentiveEarnings: daySummary.incentiveEarnings,
-        tipEarnings: daySummary.tipEarnings,
-        penaltyAmount: daySummary.penaltyAmount
-      },
-      totalEarnings: daySummary.totalEarnings,
-      incentives: daySummary.incentives || []
+      date,
+      ordersCompleted: summary?.ordersCompleted || orders.length,
+      orders: orders.map(mapOrderWithEarnings)
     });
-  } catch (error) {
-    console.error("getDayEarnings error:", error);
+  } catch (err) {
+    console.error("getDayEarnings", err);
     res.status(500).json({ message: "Failed to fetch day earnings" });
   }
 };
 
-
-/* ====================== WEEK EARNINGS ====================== */
+/* ===================== WEEK ===================== */
 /**
- * GET /api/earnings/week
+ * GET /api/earnings/week?start=YYYY-MM-DD&end=YYYY-MM-DD
  */
 const getWeekEarnings = async (req, res) => {
   try {
-    if (!req.rider?._id) {
-      return res.status(401).json({ message: "Unauthorized" });
+    const { start, end } = req.query;
+    if (!isValidDate(start) || !isValidDate(end)) {
+      return res.status(400).json({ message: "Invalid date range" });
     }
 
     const riderId = req.rider._id;
-    const { start, end } = getDateRange("week");
 
     const orders = await Order.find({
       riderId,
       orderStatus: "DELIVERED",
-      createdAt: { $gte: start, $lte: end }
-    })
-      .select("orderId riderEarning createdAt")
-      .sort({ createdAt: -1 })
-      .lean();
+      $expr: {
+        $and: [
+          {
+            $gte: [
+              { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+              start
+            ]
+          },
+          {
+            $lte: [
+              { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+              end
+            ]
+          }
+        ]
+      }
+    }).lean();
 
-    let totalEarnings = 0;
+    // group by date
+    const dayMap = {};
 
-    const orderList = orders.map(order => {
-      const earnings = calculateRiderEarnings(order.riderEarning);
-      totalEarnings += earnings.total;
-
-      return {
-        orderId: order.orderId,
-        ...earnings,
-        completedAt: order.createdAt
-      };
+    orders.forEach(o => {
+      const d = o.createdAt.toISOString().slice(0, 10);
+      if (!dayMap[d]) {
+        dayMap[d] = { date: d, ordersCompleted: 0, orders: [] };
+      }
+      dayMap[d].ordersCompleted += 1;
+      dayMap[d].orders.push(mapOrderWithEarnings(o));
     });
+
+    const days = Object.values(dayMap).sort((a, b) =>
+      a.date.localeCompare(b.date)
+    );
+
+    const summaries = await EarningSummary.find({
+      riderId,
+      date: { $gte: start, $lte: end }
+    }).lean();
+
+    const totalOrders =
+      summaries.reduce((s, d) => s + d.ordersCompleted, 0) || orders.length;
+
+    const totalEarnings =
+      summaries.reduce((s, d) => s + d.totalEarnings, 0) || 0;
 
     res.json({
-      range: "week",
       from: start,
       to: end,
+      totalOrders,
       totalEarnings,
-      totalOrders: orderList.length,
-      orders: orderList
+      days
     });
-  } catch (error) {
-    console.error("getWeekEarnings error:", error);
+  } catch (err) {
+    console.error("getWeekEarnings", err);
     res.status(500).json({ message: "Failed to fetch week earnings" });
   }
 };
 
-/* ====================== MONTH EARNINGS ====================== */
+/* ===================== MONTH ===================== */
 /**
- * GET /api/earnings/month
+ * GET /api/earnings/jan
  */
-const getMonthEarnings = async (req, res) => {
+const getMonthEarnings = async (req, res, next) => {
   try {
-    if (!req.rider?._id) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
+    const key = req.params.param.toLowerCase();
+    if (!VALID_MONTHS.includes(key)) return next();
 
     const riderId = req.rider._id;
-    const { start, end } = getDateRange("month");
+    const year = new Date().getFullYear();
+    const { start, end } = getMonthRange(year, MONTH_MAP[key]);
 
     const orders = await Order.find({
       riderId,
       orderStatus: "DELIVERED",
-      createdAt: { $gte: start, $lte: end }
-    })
-      .select("orderId riderEarning createdAt")
-      .sort({ createdAt: -1 })
-      .lean();
+      $expr: {
+        $and: [
+          {
+            $gte: [
+              { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+              start
+            ]
+          },
+          {
+            $lt: [
+              { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+              end
+            ]
+          }
+        ]
+      }
+    }).lean();
 
-    let totalEarnings = 0;
+    // group by week
+    const weekMap = {};
 
-    const orderList = orders.map(order => {
-      const earnings = calculateRiderEarnings(order.riderEarning);
-      totalEarnings += earnings.total;
+    orders.forEach(o => {
+      const d = new Date(o.createdAt);
+      const weekStart = new Date(d);
+      weekStart.setDate(d.getDate() - d.getDay());
+      const wk = weekStart.toISOString().slice(0, 10);
 
-      return {
-        orderId: order.orderId,
-        ...earnings,
-        completedAt: order.createdAt
-      };
+      if (!weekMap[wk]) {
+        weekMap[wk] = {
+          from: wk,
+          to: wk,
+          ordersCompleted: 0,
+          orders: []
+        };
+      }
+
+      const dayStr = d.toISOString().slice(0, 10);
+      weekMap[wk].to = dayStr;
+      weekMap[wk].ordersCompleted += 1;
+      weekMap[wk].orders.push(mapOrderWithEarnings(o));
     });
+
+    const weeks = Object.values(weekMap).sort((a, b) =>
+      a.from.localeCompare(b.from)
+    );
+
+    const summaries = await EarningSummary.find({
+      riderId,
+      date: { $gte: start, $lt: end }
+    }).lean();
+
+    const totalOrders =
+      summaries.reduce((s, d) => s + d.ordersCompleted, 0) || orders.length;
+
+    const totalEarnings =
+      summaries.reduce((s, d) => s + d.totalEarnings, 0) || 0;
 
     res.json({
-      range: "month",
-      month: start.toISOString().slice(0, 7),
+      from: start,
+      to: end,
+      totalOrders,
       totalEarnings,
-      totalOrders: orderList.length,
-      orders: orderList
+      weeks
     });
-  } catch (error) {
-    console.error("getMonthEarnings error:", error);
+  } catch (err) {
+    console.error("getMonthEarnings", err);
     res.status(500).json({ message: "Failed to fetch month earnings" });
   }
 };
 
-/* ====================== EARNINGS SUMMARY ====================== */
-/**
- * GET /api/earnings/summary
- */
+
 const getEarningsSummary = async (req, res) => {
   try {
-    if (!req.rider?._id) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
+    const riderId = req.rider._id;
 
-    const riderId = new mongoose.Types.ObjectId(req.rider._id);
-    const todayDate = today();
-    const monthStart = todayDate.slice(0, 7) + "-01";
+    // -------- TODAY --------
+    const today = new Date().toISOString().slice(0, 10);
 
-    const todayData = await EarningSummary.findOne(
-      { riderId, date: todayDate },
-      { totalEarnings: 1 }
+    const todaySummary = await EarningSummary.findOne(
+      { riderId, date: today },
+      { ordersCompleted: 1, totalEarnings: 1 }
     ).lean();
 
+    // -------- WEEK (Mon → Sun) --------
+    const now = new Date();
+    const day = now.getDay() || 7;
+
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - day + 1);
+    weekStart.setHours(0, 0, 0, 0);
+
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+
+    const weekStartStr = weekStart.toISOString().slice(0, 10);
+    const weekEndStr = weekEnd.toISOString().slice(0, 10);
+
+    const weekAgg = await EarningSummary.aggregate([
+      {
+        $match: {
+          riderId,
+          date: { $gte: weekStartStr, $lte: weekEndStr }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          ordersCompleted: { $sum: "$ordersCompleted" },
+          totalEarnings: { $sum: "$totalEarnings" }
+        }
+      }
+    ]);
+
+    // -------- MONTH --------
+    const monthStart = today.slice(0, 7) + "-01";
+
     const monthAgg = await EarningSummary.aggregate([
-      { $match: { riderId, date: { $gte: monthStart } } },
-      { $group: { _id: null, total: { $sum: "$totalEarnings" } } }
+      {
+        $match: {
+          riderId,
+          date: { $gte: monthStart }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          ordersCompleted: { $sum: "$ordersCompleted" },
+          totalEarnings: { $sum: "$totalEarnings" }
+        }
+      }
     ]);
 
     res.json({
-      todayEarnings: todayData?.totalEarnings || 0,
-      monthEarnings: monthAgg[0]?.total || 0
+      today: {
+        date: today,
+        ordersCompleted: todaySummary?.ordersCompleted || 0,
+        totalEarnings: todaySummary?.totalEarnings || 0
+      },
+      week: {
+        from: weekStartStr,
+        to: weekEndStr,
+        ordersCompleted: weekAgg[0]?.ordersCompleted || 0,
+        totalEarnings: weekAgg[0]?.totalEarnings || 0
+      },
+      month: {
+        from: monthStart,
+        to: today.slice(0, 7) + "-31",
+        ordersCompleted: monthAgg[0]?.ordersCompleted || 0,
+        totalEarnings: monthAgg[0]?.totalEarnings || 0
+      }
     });
   } catch (error) {
     console.error("getEarningsSummary error:", error);
@@ -571,68 +1206,14 @@ const getEarningsSummary = async (req, res) => {
   }
 };
 
-/* ====================== WALLET ====================== */
-/**
- * GET /api/earnings/wallet
- */
-const getWallet = async (req, res) => {
-  try {
-    const rider = await Rider.findById(req.rider._id).select("wallet");
+module.exports = { getEarningsSummary };
 
-    res.json({
-      balance: rider?.wallet?.balance || 0,
-      totalEarned: rider?.wallet?.totalEarned || 0,
-      totalWithdrawn: rider?.wallet?.totalWithdrawn || 0
-    });
-  } catch (error) {
-    console.error("getWallet error:", error);
-    res.status(500).json({ message: "Failed to fetch wallet" });
-  }
-};
 
-/* ====================== EARNINGS ORDERS LIST ====================== */
-/**
- * GET /api/earnings/orders?type=day|week|month
- */
-const getEarningsOrders = async (req, res) => {
-  try {
-    const riderId = req.rider._id;
-    const type = req.query.type || "day";
-    const { start, end } = getDateRange(type);
-
-    const orders = await Order.find({
-      riderId,
-      orderStatus: "DELIVERED",
-      createdAt: { $gte: start, $lte: end }
-    })
-      .select("orderId riderEarning createdAt")
-      .sort({ createdAt: -1 })
-      .lean();
-
-    let totalEarnings = 0;
-
-    const result = orders.map(order => {
-      const earnings = calculateRiderEarnings(order.riderEarning);
-      totalEarnings += earnings.total;
-
-      return {
-        orderId: order.orderId,
-        ...earnings,
-        completedAt: order.createdAt
-      };
-    });
-
-    res.json({ type, totalEarnings, orders: result });
-  } catch (error) {
-    res.status(500).json({ message: "Failed to fetch earnings orders" });
-  }
-};
-
-/* ====================== ORDER EARNING DETAIL ====================== */
+/* ===================== ORDER DETAIL ===================== */
 /**
  * GET /api/earnings/orders/:orderId
  */
-const getEarningOrderDetail = async (req, res) => {
+const getOrderEarningDetail = async (req, res) => {
   try {
     const order = await Order.findOne({
       riderId: req.rider._id,
@@ -641,35 +1222,35 @@ const getEarningOrderDetail = async (req, res) => {
     }).lean();
 
     if (!order) {
-      return res.status(404).json({
-        message: "Order not found or not delivered"
-      });
+      return res.status(404).json({ message: "Order not found" });
     }
 
-    const earnings = calculateRiderEarnings(order.riderEarning);
+    const e = order.riderEarning || {};
 
     res.json({
       orderId: order.orderId,
-      vendorShopName: order.vendorShopName,
-      status: "COMPLETED",
-      earnings,
-      deliveryDetails: {
-        distanceInKm: order?.tracking?.distanceInKm || 0,
-        durationInMin: order?.tracking?.durationInMin || 0
-      },
-      deliveredAt: order.updatedAt
+      earnings: {
+        basePay: e.basePay || 0,
+        distancePay: e.distancePay || 0,
+        surgePay: e.surgePay || 0,
+        tips: e.tips || 0,
+        total:
+          (e.basePay || 0) +
+          (e.distancePay || 0) +
+          (e.surgePay || 0) +
+          (e.tips || 0)
+      }
     });
-  } catch (error) {
-    res.status(500).json({ message: "Failed to fetch order earning detail" });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch order earnings" });
   }
 };
 
 module.exports = {
-  getDayEarnings,
-  getWeekEarnings,
   getMonthEarnings,
-  getEarningsSummary,
-  getWallet,
-  getEarningsOrders,
-  getEarningOrderDetail
+  getWeekEarnings,
+  getDayEarnings,
+  getOrderEarningDetail,
+  getEarningsSummary
 };
+
