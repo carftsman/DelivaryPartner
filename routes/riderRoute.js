@@ -15,6 +15,7 @@ const {
   savePermissions,
   logoutOrDelete,
   onboardingStatus,
+  completeKyc,
   refreshAccessToken,
   deviceToken,
   initializeApp,
@@ -760,6 +761,67 @@ riderRouter.delete("/rider/logout", riderAuthMiddleWare,logoutOrDelete)
  */
 
 riderRouter.get("/rider/onboarding-status", riderAuthMiddleWare,onboardingStatus)
+
+
+/**
+ * @swagger
+ * /api/rider/complete-kyc:
+ *   post:
+ *     tags: [kyc-Approve]
+ *     summary: Complete rider KYC and mark as fully registered
+ *     description: >
+ *       This API verifies that all onboarding steps are completed.
+ *       If successful, it marks KYC as completed and sets the rider as fully registered.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: KYC completed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: KYC completed and rider fully registered
+ *                 onboardingStage:
+ *                   type: string
+ *                   example: COMPLETED
+ *                 onboardingProgress:
+ *                   type: object
+ *                   properties:
+ *                     kycCompleted:
+ *                       type: boolean
+ *                       example: true
+ *                 isFullyRegistered:
+ *                   type: boolean
+ *                   example: true
+ *       400:
+ *         description: Onboarding steps not completed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Onboarding steps not completed
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Rider not found
+ *       500:
+ *         description: Server error
+ */
+
+riderRouter.post("/rider/complete-kyc",riderAuthMiddleWare,completeKyc );
 
 
 /**

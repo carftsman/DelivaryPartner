@@ -727,7 +727,7 @@ exports.logoutOrDelete = async (req, res) => {
 //   }
 // };
 
-
+//2ndd
 exports.onboardingStatus = async (req, res) => {
   try {
     if (!req.rider?._id) {
@@ -736,44 +736,25 @@ exports.onboardingStatus = async (req, res) => {
         message: "Unauthorized",
       });
     }
-
+ 
     const rider = await Rider.findById(req.rider._id)
       .select("onboardingStage onboardingProgress");
-
+ 
     if (!rider) {
       return res.status(404).json({
         success: false,
         message: "Rider not found",
       });
     }
-
-    const progress = rider.onboardingProgress;
-
-    // ✅ DERIVED VALUES
-    const kycCompleted =
-      progress.phoneVerified &&
-      progress.appPermissionDone &&
-      progress.citySelected &&
-      progress.vehicleSelected &&
-      progress.personalInfoSubmitted &&
-      progress.selfieUploaded &&
-      progress.aadharVerified &&
-      progress.panUploaded &&
-      progress.dlUploaded;
-
-    const isFullyRegistered = kycCompleted; // 👈 EXACTLY WHAT YOU WANT
-
+ 
+    // ✅ RETURN EXACTLY WHAT IS IN DB — NOTHING MORE
     return res.status(200).json({
       success: true,
       message: "Onboarding status fetched successfully",
-      onboardingStage: kycCompleted ? "COMPLETED" : rider.onboardingStage,
-      onboardingProgress: {
-        ...progress.toObject(),
-        kycCompleted,
-      },
-      isFullyRegistered,
+      onboardingStage: rider.onboardingStage,
+      onboardingProgress: rider.onboardingProgress,
     });
-
+ 
   } catch (error) {
     console.error("OnboardingStatus Error:", error);
     return res.status(500).json({
@@ -784,6 +765,69 @@ exports.onboardingStatus = async (req, res) => {
 };
 
 
+
+
+exports.completeKyc = async (req, res) => {
+  try {
+    const riderId = req.rider._id;
+    console.log(riderId)
+
+    const rider = await Rider.findById(riderId);
+    console.log(rider)
+
+
+
+    if (!rider) {
+      return res.status(404).json({
+        success: false,
+        message: "Rider not found",
+      });
+    }
+
+    const progress = rider.onboardingProgress;
+
+    // ✅ STEP 1: Validate onboarding completion
+    const allStepsCompleted =
+      progress.phoneVerified &&
+      progress.appPermissionDone &&
+      progress.citySelected &&
+      progress.vehicleSelected &&
+      progress.personalInfoSubmitted &&
+      progress.selfieUploaded &&
+      progress.aadharVerified &&
+      progress.panUploaded &&
+      progress.dlUploaded;
+
+    if (!allStepsCompleted) {
+      return res.status(400).json({
+        success: false,
+        message: "Onboarding steps not completed",
+      });
+    }
+
+    // ✅ STEP 2: Update flags
+    rider.onboardingProgress.kycCompleted = true;
+    rider.isFullyRegistered = true;
+    rider.onboardingStage = "COMPLETED";
+
+    await rider.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "KYC completed and rider fully registered",
+      onboardingStage: rider.onboardingStage,
+      onboardingProgress: rider.onboardingProgress,
+      isFullyRegistered: rider.isFullyRegistered,
+    });
+
+  } catch (error) {
+    console.error("CompleteKyc Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while completing KYC",
+    });
+  }
+};
 
 
 
