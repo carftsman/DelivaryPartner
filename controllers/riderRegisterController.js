@@ -730,15 +730,15 @@ exports.logoutOrDelete = async (req, res) => {
 //2ndd
 exports.onboardingStatus = async (req, res) => {
   try {
-    if (!req.rider?._id) {
+    if (!req.rider._id) {
       return res.status(401).json({
         success: false,
-        message: "Unauthorized",
+        message: "Unauthorized: Rider token invalid",
       });
     }
  
     const rider = await Rider.findById(req.rider._id)
-      .select("onboardingStage onboardingProgress");
+      .select("onboardingStage onboardingProgress isFullyRegistered");
  
     if (!rider) {
       return res.status(404).json({
@@ -747,19 +747,20 @@ exports.onboardingStatus = async (req, res) => {
       });
     }
  
-    // ✅ RETURN EXACTLY WHAT IS IN DB — NOTHING MORE
     return res.status(200).json({
       success: true,
       message: "Onboarding status fetched successfully",
       onboardingStage: rider.onboardingStage,
       onboardingProgress: rider.onboardingProgress,
+      kycCompleted: rider.onboardingProgress?.kycCompleted ?? false, // ✅ EXPOSE FROM DB
+      isFullyRegistered: rider.isFullyRegistered
     });
  
   } catch (error) {
     console.error("OnboardingStatus Error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server error",
+      message: "Server error while fetching onboarding status",
     });
   }
 };
