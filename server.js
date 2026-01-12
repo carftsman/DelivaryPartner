@@ -46,7 +46,7 @@ dotenv.config();
 const http = require("http");
 const connectDB = require("./config/db");
 const app = require("./app");
-const initWebSocket = require("./webSocket");
+const {initWebSocket} = require("./webSocket");
  
 connectDB();
  

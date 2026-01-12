@@ -55,61 +55,61 @@ const OrderSchema = new Schema(
  
     // Rider Earning
     // Rider Earning
-
+ 
     riderEarning: {
-
+ 
       basePay: {
-
+ 
       type: Number,
-
+ 
       default: 0
-
+ 
     },
  
     distancePay: {
-
+ 
       type: Number,
-
+ 
       default: 0
-
+ 
     },
  
     surgePay: {
-
+ 
       type: Number,
-
+ 
       default: 0
-
+ 
     },
  
     tips: {
-
+ 
       type: Number,
-
+ 
       default: 0
-
+ 
     },
  
     totalEarning: {
-
+ 
       type: Number,
-
+ 
       default: 0
-
+ 
     },
  
     credited: {
-
-      type: Boolean,
-
-      default: false
-
-    }
-
-  },
-
  
-    
+      type: Boolean,
+ 
+      default: false
+ 
+    }
+ 
+  },
+ 
+ 
+   
     // Order Status
     orderStatus: {
       type: String,
@@ -154,6 +154,23 @@ const OrderSchema = new Schema(
       durationInMin: Number
     },
  
+    allocation: {
+  candidateRiders: [
+    {
+      riderId: { type: Schema.Types.ObjectId, ref: "Rider" },
+      status: {
+        type: String,
+        enum: ["PENDING", "ACCEPTED", "REJECTED", "TIMEOUT"],
+        default: "PENDING"
+      },
+      notifiedAt: Date
+    }
+  ],
+  assignedAt: Date,
+  expiresAt: Date
+},
+ 
+ 
     // Settlement flags
     settlement: {
       riderEarningAdded: { type: Boolean, default: false },
@@ -162,10 +179,12 @@ const OrderSchema = new Schema(
   },
   { timestamps: true }
 );
-
+ 
  
 module.exports = mongoose.model(
   "Order",
   OrderSchema,
-  "order" 
+  "order"
 );
+ 
+ 
