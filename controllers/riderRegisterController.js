@@ -752,7 +752,6 @@ exports.onboardingStatus = async (req, res) => {
       message: "Onboarding status fetched successfully",
       onboardingStage: rider.onboardingStage,
       onboardingProgress: rider.onboardingProgress,
-      kycCompleted: rider.onboardingProgress?.kycCompleted ?? false, // ✅ EXPOSE FROM DB
       isFullyRegistered: rider.isFullyRegistered
     });
  
