@@ -486,7 +486,6 @@ exports.updateDocuments = async (req, res) => {
             "kyc.pan.updatedAt": new Date()
           }
         },
-        { new: true }
       );
 
       return res.status(200).json({
