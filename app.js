@@ -15,7 +15,7 @@ const staticRouter = require("./routes/staticMobileOtpRoute");
 const profileRoutes = require("./routes/profileRoutes");
 const incentiveRoutes = require("./routes/incentiveRoutes");
 const earningsRoutes = require("./routes/earningsRoutes");
-
+const adminRouterIncentives = require("./routes/adminInccentiveRoutes");
 
 
 
@@ -68,6 +68,7 @@ app.use("/api/bank", bankDetailsRoutes);
 app.use("/api/mobile",staticRouter);
 
 app.use("/api/admin", adminRoutes);
+app.use("/api/admin/incentives",adminRouterIncentives);
 
 app.use("/api/rider", kitRouter);
 app.use("/api/slots", slotRouter);
