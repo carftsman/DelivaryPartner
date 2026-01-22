@@ -16,6 +16,8 @@ const profileRoutes = require("./routes/profileRoutes");
 const incentiveRoutes = require("./routes/incentiveRoutes");
 const earningsRoutes = require("./routes/earningsRoutes");
 const adminRouterIncentives = require("./routes/adminInccentiveRoutes");
+const riderIncentiveRoutes = require("./routes/incentiveRiderRoutes");
+
 
 
 
@@ -83,6 +85,7 @@ app.use("/api/home", incentiveRoutes);
 // app.use("/api/earnings", earningsRoutes);
 app.use("/api/rider/earnings", earningsRoutes);
 app.use("/api/profile/insurance", insuranceRoutes);
+app.use("/api/rider/incentives", riderIncentiveRoutes);
 
 app.use("/api/issues", issueRouter);
 

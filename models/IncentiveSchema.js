@@ -75,12 +75,26 @@ const IncentiveSchema = new Schema(
 
     {
 
-      minOrders: Number,       // eg: 10
+      // minOrders: Number,       // eg: 10
 
-      maxOrders: Number,       // eg: 12
+      // maxOrders: Number,       // eg: 12
 
-      rewardAmount: Number     // eg: 100
+      // rewardAmount: Number     // eg: 100
+peak: [
+      {
+        minOrders: { type: Number, required: true },
+        maxOrders: { type: Number, required: true },
+        rewardAmount: { type: Number, required: true }
+      }
+    ],
 
+    normal: [
+      {
+        minOrders: { type: Number, required: true },
+        maxOrders: { type: Number, required: true },
+        rewardAmount: { type: Number, required: true }
+      }
+    ]
     }
 
   ],
