@@ -1,32 +1,31 @@
 const express = require("express");
 const router = express.Router();
- 
+
 const {
- createOrder,
- assignOrderToRider,
- confirmOrder,
- rejectOrder,
- acceptOrder,
- getOrderDetails,
- pickupOrder
- 
+  createOrder,
+  confirmOrder,
+  // assignOrderToRider,
+   acceptOrder,
+   rejectOrder,
+   getOrderDetails,
+  // pickupOrder,
 } = require("../controllers/orderController");
- 
-// Create Order
+
+// ================================
+// CREATE ORDER
+// ================================
 
 /**
  * @swagger
- * api/orders/orderCreate:
+ * /api/orders/orderCreate:
  *   post:
  *     tags:
  *       - Orders
  *     summary: Create a new order
  *     description: >
- *       Creates a new order with items, pickup & delivery address,
- *       pricing calculation, and payment details.
- *       Item total and final amount are calculated server-side.
- *     security:
- *       - bearerAuth: []
+ *       Creates a new order with vendor details, items, pickup and delivery addresses.
+ *       Item total is calculated on the server side.
+ *       Order status will be CREATED after successful creation.
  *     requestBody:
  *       required: true
  *       content:
@@ -38,73 +37,87 @@ const {
  *               - items
  *               - pickupAddress
  *               - deliveryAddress
+ *               - payment
  *             properties:
  *               vendorShopName:
  *                 type: string
- *                 example: Pizza Hut
- *               userId:
- *                 type: string
- *                 example: 694fa3df48bc25e14034aaf1
+ *                 example: Daily Needs Store
  *               items:
  *                 type: array
+ *                 minItems: 1
  *                 items:
  *                   type: object
  *                   required:
- *                     - name
+ *                     - itemName
  *                     - quantity
  *                     - price
  *                   properties:
- *                     name:
+ *                     itemName:
  *                       type: string
- *                       example: Margherita Pizza
+ *                       example: Basmati Rice
  *                     quantity:
  *                       type: number
- *                       example: 2
+ *                       example: 5
  *                     price:
  *                       type: number
- *                       example: 250
+ *                       example: 60
  *               pickupAddress:
  *                 type: object
+ *                 required:
+ *                   - name
+ *                   - lat
+ *                   - lng
+ *                   - addressLine
+ *                   - contactNumber
  *                 properties:
- *                   address:
+ *                   name:
  *                     type: string
- *                     example: Pizza Hut, Miyapur
- *                   city:
+ *                     example: Daily Needs Store
+ *                   lat:
+ *                     type: number
+ *                     example: 17.42
+ *                   lng:
+ *                     type: number
+ *                     example: 78.39
+ *                   addressLine:
  *                     type: string
- *                     example: Hyderabad
- *                   pincode:
+ *                     example: Miyapur
+ *                   contactNumber:
  *                     type: string
- *                     example: "500049"
+ *                     example: "9012345679"
  *               deliveryAddress:
  *                 type: object
+ *                 required:
+ *                   - name
+ *                   - lat
+ *                   - lng
+ *                   - addressLine
+ *                   - contactNumber
  *                 properties:
- *                   address:
+ *                   name:
  *                     type: string
- *                     example: Flat 203, KPHB Colony
- *                   city:
- *                     type: string
- *                     example: Hyderabad
- *                   pincode:
- *                     type: string
- *                     example: "500085"
- *               pricing:
- *                 type: object
- *                 properties:
- *                   deliveryFee:
+ *                     example: Anil Sharma
+ *                   lat:
  *                     type: number
- *                     example: 40
- *                   tax:
+ *                     example: 17.46
+ *                   lng:
  *                     type: number
- *                     example: 18
+ *                     example: 78.41
+ *                   addressLine:
+ *                     type: string
+ *                     example: Kukatpally
+ *                   contactNumber:
+ *                     type: string
+ *                     example: "9898989896"
  *               payment:
  *                 type: object
+ *                 required:
+ *                   - mode
  *                 properties:
- *                   method:
+ *                   mode:
  *                     type: string
- *                     example: CASH
- *                   status:
- *                     type: string
- *                     example: PENDING
+ *                     enum: [COD, ONLINE]
+ *                     example: COD
  *     responses:
  *       201:
  *         description: Order created successfully
@@ -113,37 +126,28 @@ const {
  *             schema:
  *               type: object
  *               properties:
- *                 message:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 orderId:
  *                   type: string
- *                   example: Order created successfully
- *                 order:
- *                   type: object
- *                   properties:
- *                     orderId:
- *                       type: string
- *                       example: ORD-1703502045123
- *                     orderStatus:
- *                       type: string
- *                       example: CREATED
- *                     pricing:
- *                       type: object
- *                       properties:
- *                         itemTotal:
- *                           type: number
- *                           example: 500
- *                         totalAmount:
- *                           type: number
- *                           example: 558
+ *                   example: ORD-F95B0DB0
+ *                 mongoId:
+ *                   type: string
+ *                   example: 6971bf46b086deb130aac60b
  *       400:
- *         description: Missing required fields
- *       401:
- *         description: Unauthorized
+ *         description: Validation error
  *       500:
  *         description: Internal server error
  */
+
 router.post("/orderCreate", createOrder);
 
-//confirm order
+// ================================
+// CONFIRM ORDER
+// ================================
+
+
 
 /**
  * @swagger
@@ -153,48 +157,47 @@ router.post("/orderCreate", createOrder);
  *       - Orders
  *     summary: Confirm an order
  *     description: >
- *       Confirms an order by changing its status from CREATED to CONFIRMED.
- *       Orders in any other status cannot be confirmed.
- *     security:
- *       - bearerAuth: []
+ *       Confirms an order that is in CREATED state.
+ *       The system finds up to 5 eligible riders, updates the order status to CONFIRMED,
+ *       allocates the riders, and sends WebSocket notifications to them.
  *     parameters:
  *       - in: path
  *         name: orderId
  *         required: true
- *         description: Unique order ID generated during order creation
+ *         description: Unique order ID to confirm
  *         schema:
  *           type: string
- *           example: ORD-1703502045123
+ *           example: ORD-F95B0DB0
  *     responses:
  *       200:
- *         description: Order confirmed successfully
+ *         description: Order confirmed successfully and riders notified
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
  *                 message:
  *                   type: string
- *                   example: Order confirmed successfully
- *                 order:
- *                   type: object
- *                   properties:
- *                     orderId:
- *                       type: string
- *                       example: ORD-1703502045123
- *                     orderStatus:
- *                       type: string
- *                       example: CONFIRMED
+ *                   example: Order confirmed and sent to riders
+ *                 notifiedRiders:
+ *                   type: number
+ *                   example: 5
  *       400:
- *         description: Order cannot be confirmed from current status
+ *         description: Invalid order state or no riders available
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
  *                 message:
  *                   type: string
- *                   example: Order cannot be confirmed from status CANCELLED
+ *                   example: Order already processed
  *       404:
  *         description: Order not found
  *         content:
@@ -202,109 +205,28 @@ router.post("/orderCreate", createOrder);
  *             schema:
  *               type: object
  *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
  *                 message:
  *                   type: string
  *                   example: Order not found
- *       401:
- *         description: Unauthorized – invalid or missing token
  *       500:
  *         description: Internal server error
  */
+
+
 
 router.patch("/:orderId/confirm", confirmOrder);
- 
- 
 
+// ================================
+// ASSIGN ORDER TO RIDER
+// ================================
+// router.patch("/:orderId/assign", assignOrderToRider);
 
-
-/**
- * @swagger
- * /api/orders/{orderId}/assign:
- *   patch:
- *     tags:
- *       - Orders
- *     summary: Assign order to a rider
- *     description: >
- *       Assigns a confirmed order to a rider.
- *       Only orders with status CONFIRMED can be assigned.
- *       Once assigned, the order status is updated to ASSIGNED
- *       and a WebSocket event is sent to the rider.
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: orderId
- *         required: true
- *         description: Unique order ID
- *         schema:
- *           type: string
- *           example: ORD-1703502045123
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - riderId
- *             properties:
- *               riderId:
- *                 type: string
- *                 description: Rider ID to whom the order is assigned
- *                 example: 694fa3df48bc25e14034aaf1
- *     responses:
- *       200:
- *         description: Order assigned successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Order assigned
- *                 order:
- *                   type: object
- *                   properties:
- *                     orderId:
- *                       type: string
- *                       example: ORD-1703502045123
- *                     orderStatus:
- *                       type: string
- *                       example: ASSIGNED
- *                     riderId:
- *                       type: string
- *                       example: 694fa3df48bc25e14034aaf1
- *       400:
- *         description: Invalid order state
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Invalid order state
- *       404:
- *         description: Order not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Order not found
- *       401:
- *         description: Unauthorized – invalid or missing token
- *       500:
- *         description: Internal server error
- */
-
-
-router.patch("/:orderId/assign", assignOrderToRider);
-
-
+// ================================
+// RIDER ACCEPT ORDER
+// ================================
 
 
 /**
@@ -313,22 +235,20 @@ router.patch("/:orderId/assign", assignOrderToRider);
  *   patch:
  *     tags:
  *       - Orders
- *     summary: Rider accepts an assigned order
+ *     summary: Rider accepts an order
  *     description: >
- *       Allows a rider to accept an order that has been assigned to them.
- *       Only orders in ASSIGNED state can be accepted.
- *       The rider must be the same rider to whom the order was assigned.
- *       Once accepted, the assignment is locked.
- *     security:
- *       - bearerAuth: []
+ *       Allows a rider to accept a CONFIRMED order within the allocation window.
+ *       The first rider to accept gets assigned.
+ *       Once accepted, all other candidate riders are automatically rejected.
+ *       This operation is atomic to avoid race conditions.
  *     parameters:
  *       - in: path
  *         name: orderId
  *         required: true
- *         description: Order ID to accept
+ *         description: Unique order ID to accept
  *         schema:
  *           type: string
- *           example: ORD-1703502045123
+ *           example: ORD-F95B0DB0
  *     requestBody:
  *       required: true
  *       content:
@@ -340,73 +260,49 @@ router.patch("/:orderId/assign", assignOrderToRider);
  *             properties:
  *               riderId:
  *                 type: string
- *                 description: Rider ID assigned to the order
- *                 example: 694fa3df48bc25e14034aaf1
+ *                 description: Rider ID who is accepting the order
+ *                 example: 696b6787f212b183b5dffe5f
  *     responses:
  *       200:
- *         description: Order accepted successfully
+ *         description: Order accepted and assigned successfully
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
  *                 message:
  *                   type: string
- *                   example: Order accepted successfully
- *                 order:
- *                   type: object
- *                   properties:
- *                     orderId:
- *                       type: string
- *                       example: ORD-1703502045123
- *                     orderStatus:
- *                       type: string
- *                       example: ASSIGNED
- *                     assignmentAcceptedAt:
- *                       type: string
- *                       format: date-time
- *                       example: 2025-01-02T10:45:30.000Z
- *       400:
- *         description: Invalid request or invalid order state
+ *                   example: Order assigned successfully
+ *                 orderId:
+ *                   type: string
+ *                   example: ORD-F95B0DB0
+ *       409:
+ *         description: Order already assigned, expired, or rider not eligible
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
  *                 message:
  *                   type: string
- *                   example: Only ASSIGNED orders can be accepted
- *       403:
- *         description: Order not assigned to this rider
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: This order is not assigned to you
- *       404:
- *         description: Order not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Order not found
- *       401:
- *         description: Unauthorized – invalid or missing token
+ *                   example: Order already assigned or expired
  *       500:
  *         description: Internal server error
  */
+
+
+
 router.patch("/:orderId/accept", acceptOrder);
 
-
-
-
-
+// ================================
+// RIDER REJECT ORDER
+// ================================
 
 
 /**
@@ -415,22 +311,19 @@ router.patch("/:orderId/accept", acceptOrder);
  *   patch:
  *     tags:
  *       - Orders
- *     summary: Rider rejects an assigned order
+ *     summary: Rider rejects an order
  *     description: >
- *       Allows a rider to reject an order that has been assigned to them.
- *       Only orders in ASSIGNED state can be rejected.
- *       On rejection, the order is unassigned and moved back to CONFIRMED state
- *       so it can be reassigned to another rider.
- *     security:
- *       - bearerAuth: []
+ *       Allows a rider to reject a CONFIRMED order during the allocation window.
+ *       The rider must be one of the allocated candidate riders and must be in PENDING state.
+ *       The rejection is handled atomically to prevent race conditions.
  *     parameters:
  *       - in: path
  *         name: orderId
  *         required: true
- *         description: Order ID to reject
+ *         description: Unique order ID to reject
  *         schema:
  *           type: string
- *           example: ORD-1703502045123
+ *           example: ORD-F95B0DB0
  *     requestBody:
  *       required: true
  *       content:
@@ -442,80 +335,52 @@ router.patch("/:orderId/accept", acceptOrder);
  *             properties:
  *               riderId:
  *                 type: string
- *                 description: Rider ID assigned to the order
- *                 example: 694fa3df48bc25e14034aaf1
+ *                 description: Rider ID who is rejecting the order
+ *                 example: 696b6787f212b183b5dffe5c
  *               reason:
  *                 type: string
- *                 description: Optional reason for rejecting the order
+ *                 description: Optional reason for rejection
  *                 example: Vehicle issue
  *     responses:
  *       200:
- *         description: Order rejected and unassigned successfully
+ *         description: Order rejected successfully
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
  *                 message:
  *                   type: string
- *                   example: Order rejected and unassigned
- *                 order:
- *                   type: object
- *                   properties:
- *                     orderId:
- *                       type: string
- *                       example: ORD-1703502045123
- *                     orderStatus:
- *                       type: string
- *                       example: CONFIRMED
- *                     riderId:
- *                       nullable: true
- *                       example: null
- *                     rejectReason:
- *                       type: string
- *                       example: Vehicle issue
- *       400:
- *         description: Invalid request or invalid order state
+ *                   example: Order rejected successfully
+ *                 pendingRiders:
+ *                   type: number
+ *                   description: Number of riders still in PENDING state
+ *                   example: 3
+ *       409:
+ *         description: Order already assigned or cannot be rejected
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
  *                 message:
  *                   type: string
- *                   example: Only ASSIGNED orders can be rejected
- *       403:
- *         description: Order not assigned to this rider
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: This order is not assigned to you
- *       404:
- *         description: Order not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Order not found
- *       401:
- *         description: Unauthorized – invalid or missing token
+ *                   example: Order already assigned or cannot be rejected
  *       500:
  *         description: Internal server error
  */
-router.patch("/:orderId/reject", rejectOrder);
 
+ router.patch("/:orderId/reject", rejectOrder);
 
-
-
-
-
+// ================================
+// GET ORDER DETAILS
+// ================================
 
 /**
  * @swagger
@@ -523,29 +388,19 @@ router.patch("/:orderId/reject", rejectOrder);
  *   get:
  *     tags:
  *       - Orders
- *     summary: Get order details
+ *     summary: Get order details by orderId
  *     description: >
- *       Fetch detailed information of an order.
- *       Riders can view order details only if the order is in
- *       ASSIGNED, PICKED_UP, or DELIVERED state and the order
- *       is assigned to them.
- *     security:
- *       - bearerAuth: []
+ *       Fetches limited order details using the orderId.
+ *       Only selected fields like items, addresses, and pricing are returned.
+ *       Rider, allocation, payment, and settlement details are intentionally excluded.
  *     parameters:
  *       - in: path
  *         name: orderId
  *         required: true
- *         description: Order ID
+ *         description: Unique order ID
  *         schema:
  *           type: string
- *           example: ORD-1703502045123
- *       - in: query
- *         name: riderId
- *         required: true
- *         description: Rider ID requesting the order details (used for authorization)
- *         schema:
- *           type: string
- *           example: 694fa3df48bc25e14034aaf1
+ *           example: ORD-F95B0DB0
  *     responses:
  *       200:
  *         description: Order details fetched successfully
@@ -554,44 +409,95 @@ router.patch("/:orderId/reject", rejectOrder);
  *             schema:
  *               type: object
  *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
  *                 message:
  *                   type: string
- *                   example: Order details fetched
- *                 order:
+ *                   example: Order details fetched successfully
+ *                 filteredOrder:
  *                   type: object
  *                   properties:
+ *                     _id:
+ *                       type: string
+ *                       example: 6971bf46b086deb130aac60b
  *                     orderId:
  *                       type: string
- *                       example: ORD-1703502045123
- *                     orderStatus:
- *                       type: string
- *                       example: ASSIGNED
+ *                       example: ORD-F95B0DB0
  *                     vendorShopName:
  *                       type: string
- *                       example: Pizza Hut
- *                     riderId:
+ *                       example: Daily Needs Store
+ *                     items:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           itemName:
+ *                             type: string
+ *                             example: Basmati Rice
+ *                           quantity:
+ *                             type: number
+ *                             example: 5
+ *                           price:
+ *                             type: number
+ *                             example: 60
+ *                           total:
+ *                             type: number
+ *                             example: 300
+ *                     pickupAddress:
  *                       type: object
- *                       nullable: true
  *                       properties:
- *                         _id:
- *                           type: string
- *                           example: 694fa3df48bc25e14034aaf1
  *                         name:
  *                           type: string
- *                           example: Rahul
- *                         phone:
+ *                           example: Daily Needs Store
+ *                         lat:
+ *                           type: number
+ *                           example: 17.42
+ *                         lng:
+ *                           type: number
+ *                           example: 78.39
+ *                         addressLine:
  *                           type: string
- *                           example: "9876543210"
- *       403:
- *         description: You are not allowed to view this order
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: You are not allowed to view this order
+ *                           example: Miyapur
+ *                         contactNumber:
+ *                           type: string
+ *                           example: "9012345679"
+ *                     deliveryAddress:
+ *                       type: object
+ *                       properties:
+ *                         name:
+ *                           type: string
+ *                           example: Anil Sharma
+ *                         lat:
+ *                           type: number
+ *                           example: 17.46
+ *                         lng:
+ *                           type: number
+ *                           example: 78.41
+ *                         addressLine:
+ *                           type: string
+ *                           example: Kukatpally
+ *                         contactNumber:
+ *                           type: string
+ *                           example: "9898989896"
+ *                     pricing:
+ *                       type: object
+ *                       properties:
+ *                         itemTotal:
+ *                           type: number
+ *                           example: 580
+ *                         deliveryFee:
+ *                           type: number
+ *                           example: 0
+ *                         tax:
+ *                           type: number
+ *                           example: 0
+ *                         platformCommission:
+ *                           type: number
+ *                           example: 0
+ *                         totalAmount:
+ *                           type: number
+ *                           example: 580
  *       404:
  *         description: Order not found
  *         content:
@@ -599,118 +505,21 @@ router.patch("/:orderId/reject", rejectOrder);
  *             schema:
  *               type: object
  *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
  *                 message:
  *                   type: string
  *                   example: Order not found
- *       401:
- *         description: Unauthorized – invalid or missing token
  *       500:
  *         description: Internal server error
  */
 router.get("/:orderId/details", getOrderDetails);
 
 
-
-
-
-
-
-
-/**
- * @swagger
- * /api/orders/{orderId}/pickup:
- *   patch:
- *     tags:
- *       - Orders
- *     summary: Rider picks up an assigned order
- *     description: >
- *       Allows the assigned rider to mark an order as picked up.
- *       Only orders in ASSIGNED state can be picked up.
- *       A WebSocket notification is optionally sent after pickup.
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: orderId
- *         required: true
- *         description: Order ID to pick up
- *         schema:
- *           type: string
- *           example: ORD-1703502045123
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - riderId
- *             properties:
- *               riderId:
- *                 type: string
- *                 description: Rider ID assigned to the order
- *                 example: 694fa3df48bc25e14034aaf1
- *     responses:
- *       200:
- *         description: Order picked up successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Order picked up successfully
- *                 order:
- *                   type: object
- *                   properties:
- *                     orderId:
- *                       type: string
- *                       example: ORD-1703502045123
- *                     orderStatus:
- *                       type: string
- *                       example: PICKED_UP
- *                     pickedUpAt:
- *                       type: string
- *                       format: date-time
- *                       example: 2025-01-02T12:30:45.000Z
- *       400:
- *         description: Order is not ready for pickup or invalid request
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Order is not ready for pickup
- *       403:
- *         description: Order not assigned to this rider
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: This order is not assigned to you
- *       404:
- *         description: Order not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Order not found
- *       401:
- *         description: Unauthorized – invalid or missing token
- *       500:
- *         description: Internal server error
- */
-router.patch("/:orderId/pickup", pickupOrder);
-
- 
+// ================================
+// PICKUP ORDER
+// ================================
+// router.patch("/:orderId/pickup", pickupOrder);
 
 module.exports = router;

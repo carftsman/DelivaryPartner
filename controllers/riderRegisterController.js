@@ -728,6 +728,10 @@ exports.logoutOrDelete = async (req, res) => {
 // };
 
 //2ndd
+
+
+
+
 exports.onboardingStatus = async (req, res) => {
   try {
     if (!req.rider._id) {
