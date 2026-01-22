@@ -42,14 +42,6 @@ exports.createWeeklyBonus = async (req, res) => {
 };
 
 
-
-
-exports.adminIncentiveController = (req, res) => {
-    res.send("Admin Incentive Endpoint")
-}
-const Incentive = require("../models/IncentiveSchema");
-
-
 // ========================================
 // ADMIN UPSERT INCENTIVE
 // ========================================
