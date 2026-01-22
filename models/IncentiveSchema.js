@@ -98,6 +98,20 @@ const IncentiveSchema = new Schema(
   maxRewardPerDay: Number,
 
   maxRewardPerWeek: Number,
+  
+  weeklyRules: {
+    totalDaysInWeek: {
+      type: Number,
+      default: 7
+    },
+    minOrdersPerDay: {
+      type: Number // eg: 10
+    },
+    allowPartialDays: {
+      type: Boolean,
+      default: true
+    }
+  },
  
   status: {
 
