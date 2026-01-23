@@ -331,7 +331,7 @@ const RiderSchema = new Schema(
       code: { type: String },
       expiresAt: { type: Date },
     },
- 
+
     isFullyRegistered: { type: Boolean, default: false },
    
     refreshToken: { type: String },
@@ -627,5 +627,8 @@ currentOrderId: {
   },
   { timestamps: true }
 );
+
+
+
  
 module.exports = mongoose.model("Rider", RiderSchema);
