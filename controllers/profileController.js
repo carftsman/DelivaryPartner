@@ -233,15 +233,31 @@ exports.getMyAssetsSummary = async (req, res) => {
       };
     });
 
+    // return res.status(200).json({
+    //   success: true,
+    //   data: {
+    //     totalAssets,
+    //     badConditionCount,
+    //     canRaiseRequest: badConditionCount > 0,
+    //     assets: formattedAssets,
+
+
+        
+    //   },
+    // });
+
+
     return res.status(200).json({
-      success: true,
-      data: {
-        totalAssets,
-        badConditionCount,
-        canRaiseRequest: badConditionCount > 0,
-        assets: formattedAssets,
-      },
-    });
+  success: true,
+  data: {
+    totalProducts: formattedAssets.length,
+    totalAssets,
+    badConditionCount,
+    canRaiseRequest: badConditionCount > 0,
+    assets: formattedAssets
+  }
+});
+
   } catch (error) {
     console.error("Assets Summary Error:", error);
     return res.status(500).json({
