@@ -18,7 +18,7 @@ const earningsRoutes = require("./routes/earningsRoutes");
 const adminRouterIncentives = require("./routes/adminInccentiveRoutes");
 const riderIncentiveRoutes = require("./routes/incentiveRiderRoutes");
 
-
+const riderEarningsRoutes = require('./routes/riderEarningsRoutes')
 
 
 
@@ -90,6 +90,11 @@ app.use("/api/rider/incentives", riderIncentiveRoutes);
 app.use("/api/issues", issueRouter);
 
 
+//new earnings routes 
+
+app.use('/api/rider/earnings',riderEarningsRoutes)  // this is the new earnings route
+
+
 
 app.use("/api/earnings", require("./routes/earningsRoutes"));
 
@@ -101,6 +106,8 @@ app.use("/api/orders", require("./routes/orderRoutes"));
 //liveTracking\
 
 app.use("/api/aerial",require("./routes/gpsRoutes"))
+
+
 
 app.get("/", (req, res) => {
   res.send("Vega Delivery Partner API Running. Open /api-docs");
