@@ -43,11 +43,6 @@ exports.createWeeklyBonus = async (req, res) => {
 
 
 
-
-exports.adminIncentiveController = (req, res) => {
-    res.send("Admin Incentive Endpoint")
-}
-
 // ========================================
 // ADMIN UPSERT INCENTIVE
 // ========================================
