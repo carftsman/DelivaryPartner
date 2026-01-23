@@ -47,8 +47,6 @@ exports.createWeeklyBonus = async (req, res) => {
 exports.adminIncentiveController = (req, res) => {
     res.send("Admin Incentive Endpoint")
 }
-// const Incentive = require("../models/IncentiveSchema");
-
 
 // ========================================
 // ADMIN UPSERT INCENTIVE
@@ -234,6 +232,126 @@ exports.upsertIncentive = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Unable to save incentive"
+    });
+  }
+};
+
+
+exports.adminIncentiveController = async (req, res) => {
+  try {
+
+    /**
+     * ===========================
+     * GET PEAK SLOT INCENTIVE
+     * ===========================
+     */
+    if (req.method === "GET") {
+      const incentive = await Incentive.findOne({
+        incentiveType: "PEAK_SLOT",
+        status: "ACTIVE"
+      }).lean();
+
+      if (!incentive || !incentive.slabs || incentive.slabs.length === 0) {
+        return res.status(200).json({
+          success: true,
+          message: "No peak slot incentive found",
+          data: null
+        });
+      }
+
+      // ✅ CORRECT ACCESS
+      const slabBlock = incentive.slabs[0];
+      const peakSlabs = slabBlock.peak || [];
+
+      const minPeak = incentive.slotRules?.minPeakSlots || 0;
+      const minNormal = incentive.slotRules?.minNormalSlots || 0;
+      const totalMinSlots = minPeak + minNormal;
+
+      const maxOrders = peakSlabs.length
+        ? Math.max(...peakSlabs.map(s => s.maxOrders))
+        : null;
+
+      const slotRule =
+        totalMinSlots && maxOrders
+          ? `${totalMinSlots} - ${maxOrders} hrs`
+          : null;
+
+      return res.status(200).json({
+        success: true,
+        message: "Peak slot incentive fetched successfully",
+        data: {
+          title: incentive.title,
+          slotRule,
+          slabs: peakSlabs.map(s => ({
+            orders: s.minOrders,
+            rewardAmount: s.rewardAmount
+          })),
+          payoutTiming: incentive.payoutTiming
+        }
+      });
+    }
+
+    /**
+     * ===========================
+     * POST PEAK SLOT INCENTIVE
+     * ===========================
+     */
+    if (req.method === "POST") {
+      const {
+        title,
+        description,
+        minPeakSlots,
+        minNormalSlots,
+        slabs,
+        status
+      } = req.body;
+
+      if (!slabs?.peak || slabs.peak.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Peak slabs are required"
+        });
+      }
+
+      await Incentive.findOneAndUpdate(
+        { incentiveType: "PEAK_SLOT" },
+        {
+          title,
+          description,
+          incentiveType: "PEAK_SLOT",
+          applicableSlots: { peak: true, normal: true },
+          slotRules: {
+            minPeakSlots,
+            minNormalSlots
+          },
+          slabs: [
+            {
+              peak: slabs.peak,
+              normal: slabs.normal || []
+            }
+          ],
+          payoutTiming: "POST_SLOT",
+          status
+        },
+        { upsert: true, new: true }
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "Peak slot incentive saved successfully"
+      });
+    }
+
+    return res.status(405).json({
+      success: false,
+      message: "Method not allowed"
+    });
+
+  } catch (error) {
+    console.error("Peak Incentive Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error"
     });
   }
 };
