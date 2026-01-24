@@ -2,6 +2,8 @@ const Order = require("../models/OrderSchema");
 const crypto = require("crypto");
 const {notifyRider} = require("../webSocket");
 const Rider=require('../models/RiderModel')
+const axios = require("axios");
+const PricingConfig=require("../models/pricingConfigSchema")
 
 async function createOrder(req, res) {
   try {
@@ -93,79 +95,375 @@ async function createOrder(req, res) {
 }
  
  
+// async function confirmOrder(req, res) {
+//   try {
+//     const { orderId } = req.params;
+ 
+//     // 1️⃣ Find order
+//     const order = await Order.findOne({ orderId });
+ 
+//     if (!order) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Order not found"
+//       });
+//     }
+ 
+//     if (order.orderStatus !== "CREATED") {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Order already processed"
+//       });
+//     }
+ 
+//     // 2️⃣ Fetch 5 eligible riders
+//     const riders = await Rider.find({
+//       "deliveryStatus.isActive": true,
+//       orderState: "READY",
+//       "riderStatus.isOnline": true
+//     })
+//       .limit(5)
+//       .select("_id");
+ 
+//     if (!riders.length) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "No riders available"
+//       });
+//     }
+ 
+//     // 3️⃣ Update order
+//     order.orderStatus = "CONFIRMED";
+//     order.allocation = {
+//       candidateRiders: riders.map(r => ({
+//         riderId: r._id,
+//         status: "PENDING",
+//         notifiedAt: new Date()
+//       })),
+//       expiresAt: new Date(Date.now() + 30 * 1000) // 30 sec window
+//     };
+ 
+//     await order.save();
+ 
+//     // 4️⃣ Notify riders via WebSocket
+//     riders.forEach(rider => {
+//       notifyRider(rider._id.toString(), {
+//         type: "ORDER_POPUP",
+//         orderId: order.orderId,
+//         vendorShopName: order.vendorShopName
+//       });
+//     });
+ 
+//     return res.json({
+//       success: true,
+//       message: "Order confirmed and sent to riders",
+//       notifiedRiders: riders.length
+//     });
+ 
+//   } catch (err) {
+//     console.error("Confirm order error:", err);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to confirm order"
+//     });
+//   }
+// }
+
+
+ 
+/* ===============================
+
+   GOOGLE DISTANCE + ETA HELPER
+
+================================ */
+
+async function getRouteInfo(pickupAddress, deliveryAddress) {
+  // 🛡️ Safety checks
+  if (!pickupAddress || !deliveryAddress) {
+    throw new Error("Pickup or Delivery address missing");
+  }
+
+  const { lat: pickupLat, lng: pickupLng } = pickupAddress;
+  const { lat: dropLat, lng: dropLng } = deliveryAddress;
+
+  if (
+    pickupLat == null ||
+    pickupLng == null ||
+    dropLat == null ||
+    dropLng == null
+  ) {
+    throw new Error("Invalid pickup/delivery coordinates");
+  }
+
+  const url = "https://maps.googleapis.com/maps/api/directions/json";
+
+  const response = await axios.get(url, {
+    params: {
+      origin: `${pickupLat},${pickupLng}`,
+      destination: `${dropLat},${dropLng}`,
+      key: process.env.GOOGLE_KEY,
+    },
+  });
+
+  if (!response.data.routes || response.data.routes.length === 0) {
+    throw new Error("No route found between pickup and drop");
+  }
+
+  const leg = response.data.routes[0].legs[0];
+
+  return {
+    distanceKm: Number((leg.distance.value / 1000).toFixed(2)),
+    etaMinutes: Math.ceil(leg.duration.value / 60),
+  };
+}
+ 
+/* ===============================
+
+   CONFIRM ORDER API
+
+================================ */
+
 async function confirmOrder(req, res) {
+
   try {
+
     const { orderId } = req.params;
  
     // 1️⃣ Find order
+
     const order = await Order.findOne({ orderId });
  
     if (!order) {
+
       return res.status(404).json({
+
         success: false,
+
         message: "Order not found"
+
       });
+
     }
  
     if (order.orderStatus !== "CREATED") {
+
       return res.status(400).json({
+
         success: false,
+
         message: "Order already processed"
+
       });
+
     }
  
-    // 2️⃣ Fetch 5 eligible riders
+    // 2️⃣ Fetch eligible riders
+
     const riders = await Rider.find({
+
       "deliveryStatus.isActive": true,
+
       orderState: "READY",
+
       "riderStatus.isOnline": true
+
     })
+
       .limit(5)
+
       .select("_id");
  
     if (!riders.length) {
+
       return res.status(400).json({
+
         success: false,
+
         message: "No riders available"
+
       });
+
     }
  
-    // 3️⃣ Update order
+    // 3️⃣ Update order allocation
+
     order.orderStatus = "CONFIRMED";
+
     order.allocation = {
+
       candidateRiders: riders.map(r => ({
+
         riderId: r._id,
+
         status: "PENDING",
+
         notifiedAt: new Date()
+
       })),
-      expiresAt: new Date(Date.now() + 30 * 1000) // 30 sec window
+
+      expiresAt: new Date(Date.now() + 30 * 1000)
+
     };
  
     await order.save();
  
-    // 4️⃣ Notify riders via WebSocket
+    /* =====================================
+
+       DISTANCE + ETA + PRICING CALCULATION
+
+    ====================================== */
+ 
+    // 📍 Distantailsce & ETA
+console.log(`order details${order}`); 
+    const routeInfo = await getRouteInfo(
+
+      order.pickupAddress,
+
+      order.deliveryAddress
+
+    );
+ 
+    // 💰 Pricing config
+
+    const pricingConfig = await PricingConfig.findOne({ isActive: true });
+
+    if (!pricingConfig) {
+
+      throw new Error("Pricing config not found");
+
+    }
+ 
+    const currentTime = new Date().toTimeString().slice(0, 5);
+
+    const isRaining = order.weather === "RAIN";
+ 
+    let estimatedEarning = 0;
+ 
+    // Base fare (ALWAYS)
+
+    estimatedEarning += pricingConfig.baseFare.baseAmount;
+ 
+    // Distance fare
+
+    if (routeInfo.distanceKm > pricingConfig.baseFare.baseDistanceKm) {
+
+      const extraKm =
+
+        routeInfo.distanceKm - pricingConfig.baseFare.baseDistanceKm;
+ 
+      estimatedEarning +=
+
+        extraKm * pricingConfig.distanceFare.perKmRate;
+
+    }
+ 
+    // Auto surges
+
+    pricingConfig.surges.forEach(surge => {
+
+      if (!surge.isActive) return;
+ 
+      let apply = false;
+ 
+      if (
+
+        surge.type === "PEAK" &&
+
+        currentTime >= surge.conditions.startTime &&
+
+        currentTime <= surge.conditions.endTime
+
+      ) apply = true;
+ 
+      if (surge.type === "RAIN" && isRaining) apply = true;
+ 
+      if (
+
+        surge.type === "ZONE" &&
+
+        surge.conditions.zoneIds?.includes(order.zoneId)
+
+      ) apply = true;
+ 
+      if (apply) {
+
+        estimatedEarning += surge.value;
+
+      }
+
+    });
+ 
+    // Save snapshot
+
+    order.earningEstimate = {
+
+      distanceKm: routeInfo.distanceKm,
+
+      etaMinutes: routeInfo.etaMinutes,
+
+      estimatedEarning
+
+    };
+ 
+    await order.save();
+ 
+    /* ===============================
+
+       WEBSOCKET NOTIFICATION
+
+    ================================ */
+
     riders.forEach(rider => {
+
       notifyRider(rider._id.toString(), {
+
         type: "ORDER_POPUP",
+
         orderId: order.orderId,
-        vendorShopName: order.vendorShopName
+
+        vendorShopName: order.vendorShopName,
+
+        pickupLocation: order.pickupLocation,
+
+        dropLocation: order.dropLocation,
+
+        distanceKm: routeInfo.distanceKm,
+
+        etaMinutes: routeInfo.etaMinutes,
+
+        estimatedEarning
+
       });
+
     });
  
     return res.json({
+
       success: true,
+
       message: "Order confirmed and sent to riders",
+
       notifiedRiders: riders.length
+
     });
  
   } catch (err) {
+
     console.error("Confirm order error:", err);
+
     return res.status(500).json({
+
       success: false,
+
       message: "Failed to confirm order"
+
     });
+
   }
+
 }
+
+ 
 
 
 

@@ -25,6 +25,9 @@ const riderEarningsRoutes = require('./routes/riderEarningsRoutes')
 const insuranceRoutes = require("./routes/insuranceRoutes");
 const issueRouter =  require("./routes/issueRoutes")
 
+const pricingConfigRoutes = require("./routes/pricingConfigRoutes");
+
+
 
 
 // const offlineStoreRoute = require("./routes/offlineStoreRoute");
@@ -106,6 +109,9 @@ app.use("/api/orders", require("./routes/orderRoutes"));
 //liveTracking\
 
 app.use("/api/aerial",require("./routes/gpsRoutes"))
+
+app.use("/api", pricingConfigRoutes);
+
 
 
 
