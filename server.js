@@ -56,8 +56,12 @@ connectDB();
 const server = http.createServer(app);
  
 // Attach WebSocket to SAME server
+<<<<<<< Updated upstream
 initWebSocket(server);  
 // initRiderSocket(server);
+=======
+initWebSocket(server);
+>>>>>>> Stashed changes
  
 const PORT = process.env.PORT || 4000;
  
