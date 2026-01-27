@@ -186,7 +186,7 @@ router.post("/orderCreate", createOrder);
 /**
  * @swagger
  * /api/orders/{orderId}/confirm:
- *   post:
+ *   patch:
  *     tags:
  *       - Orders
  *     summary: Confirm order and notify nearby riders
@@ -565,6 +565,9 @@ router.patch("/:orderId/accept", acceptOrder);
  *         description: Internal server error
  */
 router.get("/:orderId/details", getOrderDetails);
+
+
+
 
 
 // ================================
