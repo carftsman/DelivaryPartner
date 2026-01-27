@@ -43,15 +43,6 @@ exports.createWeeklyBonus = async (req, res) => {
 
 
 
-<<<<<<< Updated upstream
-=======
-
-exports.adminIncentiveController = (req, res) => {
-    res.send("Admin Incentive Endpoint")
-}
-
-
->>>>>>> Stashed changes
 // ========================================
 // ADMIN UPSERT INCENTIVE
 // ========================================
