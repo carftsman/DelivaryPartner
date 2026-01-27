@@ -1,5 +1,5 @@
 const Slot = require("../models/SlotModel");
-const getWeekNumber = require("../helpers/getWeekNumber");
+const {getWeekNumber} = require("../helpers/getWeekNumber");
 
 const SlotBooking = require("../models/SlotBookingModel");
 const Rider = require("../models/RiderModel");
