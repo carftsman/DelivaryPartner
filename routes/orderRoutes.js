@@ -23,9 +23,13 @@ const {
  *       - Orders
  *     summary: Create a new order
  *     description: >
- *       Creates a new order with vendor details, items, pickup and delivery addresses.
- *       Item total is calculated on the server side.
- *       Order status will be CREATED after successful creation.
+ *       Creates a new order with item-level pricing calculation.
+ *       This API only creates the order and sets initial values.
+ *       Rider allocation, distance, ETA, and earnings are handled later.
+ *
+ *     security:
+ *       - bearerAuth: []
+ *
  *     requestBody:
  *       required: true
  *       content:
@@ -41,7 +45,8 @@ const {
  *             properties:
  *               vendorShopName:
  *                 type: string
- *                 example: Daily Needs Store
+ *                 example: Fresh Mart Grocery
+ *
  *               items:
  *                 type: array
  *                 minItems: 1
@@ -57,10 +62,11 @@ const {
  *                       example: Basmati Rice
  *                     quantity:
  *                       type: number
- *                       example: 5
+ *                       example: 2
  *                     price:
  *                       type: number
  *                       example: 60
+ *
  *               pickupAddress:
  *                 type: object
  *                 required:
@@ -72,19 +78,20 @@ const {
  *                 properties:
  *                   name:
  *                     type: string
- *                     example: Daily Needs Store
+ *                     example: Fresh Mart Store
  *                   lat:
  *                     type: number
- *                     example: 17.42
+ *                     example: 17.4200
  *                   lng:
  *                     type: number
- *                     example: 78.39
+ *                     example: 78.3900
  *                   addressLine:
  *                     type: string
- *                     example: Miyapur
+ *                     example: Madhapur, Hyderabad
  *                   contactNumber:
  *                     type: string
- *                     example: "9012345679"
+ *                     example: 9876543210
+ *
  *               deliveryAddress:
  *                 type: object
  *                 required:
@@ -96,19 +103,20 @@ const {
  *                 properties:
  *                   name:
  *                     type: string
- *                     example: Anil Sharma
+ *                     example: Rohit Kumar
  *                   lat:
  *                     type: number
- *                     example: 17.46
+ *                     example: 17.4600
  *                   lng:
  *                     type: number
- *                     example: 78.41
+ *                     example: 78.4100
  *                   addressLine:
  *                     type: string
- *                     example: Kukatpally
+ *                     example: Kukatpally, Hyderabad
  *                   contactNumber:
  *                     type: string
- *                     example: "9898989896"
+ *                     example: 9123456780
+ *
  *               payment:
  *                 type: object
  *                 required:
@@ -118,6 +126,7 @@ const {
  *                     type: string
  *                     enum: [COD, ONLINE]
  *                     example: COD
+ *
  *     responses:
  *       201:
  *         description: Order created successfully
@@ -131,16 +140,39 @@ const {
  *                   example: true
  *                 orderId:
  *                   type: string
- *                   example: ORD-F95B0DB0
+ *                   example: ORD-8F3A2C1B
  *                 mongoId:
  *                   type: string
- *                   example: 6971bf46b086deb130aac60b
+ *                   example: 65a9b2c44e1f2a0012a45678
+ *
  *       400:
  *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: vendorShopName is required
+ *
  *       500:
- *         description: Internal server error
+ *         description: Internal server error while creating order
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Order creation failed
  */
-
 router.post("/orderCreate", createOrder);
 
 // ================================
@@ -155,22 +187,25 @@ router.post("/orderCreate", createOrder);
  *   patch:
  *     tags:
  *       - Orders
- *     summary: Confirm an order
+ *     summary: Confirm order and notify nearby riders
  *     description: >
- *       Confirms an order that is in CREATED state.
- *       The system finds up to 5 eligible riders, updates the order status to CONFIRMED,
- *       allocates the riders, and sends WebSocket notifications to them.
+ *       Confirms a newly created order, finds eligible active riders,
+ *       calculates distance, ETA, and estimated earnings,
+ *       and sends real-time order popup notifications via WebSocket.
+ *     security:
+ *       - bearerAuth: []
+ *
  *     parameters:
  *       - in: path
  *         name: orderId
  *         required: true
- *         description: Unique order ID to confirm
  *         schema:
  *           type: string
- *           example: ORD-F95B0DB0
+ *         example: ORD-12345
+ *
  *     responses:
  *       200:
- *         description: Order confirmed successfully and riders notified
+ *         description: Order confirmed and notifications sent successfully
  *         content:
  *           application/json:
  *             schema:
@@ -183,10 +218,11 @@ router.post("/orderCreate", createOrder);
  *                   type: string
  *                   example: Order confirmed and sent to riders
  *                 notifiedRiders:
- *                   type: number
+ *                   type: integer
  *                   example: 5
+ *
  *       400:
- *         description: Invalid order state or no riders available
+ *         description: Bad request (order already processed or no riders available)
  *         content:
  *           application/json:
  *             schema:
@@ -197,7 +233,8 @@ router.post("/orderCreate", createOrder);
  *                   example: false
  *                 message:
  *                   type: string
- *                   example: Order already processed
+ *                   example: No riders available
+ *
  *       404:
  *         description: Order not found
  *         content:
@@ -211,10 +248,21 @@ router.post("/orderCreate", createOrder);
  *                 message:
  *                   type: string
  *                   example: Order not found
+ *
  *       500:
- *         description: Internal server error
+ *         description: Internal server error while confirming order
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Failed to confirm order
  */
-
 
 
 router.patch("/:orderId/confirm", confirmOrder);

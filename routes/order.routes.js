@@ -1,6 +1,13 @@
-const router = require("express").Router();
+const express = require("express");
+
+const router = express.Router();
+
 const { markOrderDelivered } = require("../controllers/order.controller");
 
-router.put("/deliver/:id", markOrderDelivered);
+// ---------------- DELIVER ORDER ----------------
+
+// PATCH /api/orders/deliver/:id
+
+router.patch("/deliver/:id", markOrderDelivered);
 
 module.exports = router;

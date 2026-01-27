@@ -17,7 +17,7 @@ const incentiveRoutes = require("./routes/incentiveRoutes");
 const earningsRoutes = require("./routes/earningsRoutes");
 const adminRouterIncentives = require("./routes/adminInccentiveRoutes");
 const riderIncentiveRoutes = require("./routes/incentiveRiderRoutes");
-// const webIncentiveRoutes = require("./routes/order.routes");
+const webIncentiveRoutes = require("./routes/order.routes");
 // const webRiderRoutes = require("./routes/rider.routes");
 
 const riderEarningsRoutes = require('./routes/riderEarningsRoutes')
@@ -111,7 +111,7 @@ app.use("/api/orders", require("./routes/orderRoutes"));
 //liveTracking\
 
 app.use("/api/aerial",require("./routes/gpsRoutes"))
-// app.use("/api/web",webIncentiveRoutes)
+app.use("/api/web",webIncentiveRoutes)
 // app.use("/api/web",webRiderRoutes)
 
 

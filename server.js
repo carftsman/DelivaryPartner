@@ -47,7 +47,7 @@ const http = require("http");
 const connectDB = require("./config/db");
 const app = require("./app");
 // const {initWebSocket} = require("./webSocket");
-const { initRiderSocket } = require("./sockets/rider.socket");
+const { initRiderSocket } = require("./sockets/socket");
 
  
 connectDB();
