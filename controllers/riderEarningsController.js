@@ -1,7 +1,8 @@
 // controllers/riderEarningsController.js
 const RiderDailyEarnings = require("../models/RiderDailyEarnings");
 const RiderOrderEarnings = require("../models/RiderOrderEarnings");
-
+const Order = require("../models/OrderSchema");
+const { getISOWeekRange , getCurrentISOWeek} = require("../helpers/getWeekNumber");
 //1 Today / Week / Month cards
 exports.getEarningsSummary = async (req, res) => {
   try {
@@ -138,57 +139,243 @@ exports.getDailyEarnings = async (req, res) => {
 
 // 4
 
+// exports.getDeliveryEarnings = async (req, res) => {
+//   try {
+//     const riderId = req.rider._id;
+//     const { orderId } = req.params;
+
+//     const earning = await Order.findOne({ riderId, orderId });
+//     // const dummy = await Order.findOne({ riderId, orderId });
+//     console.log("dummy data:", earning); // Debugging line
+
+//     if (!earning) {
+//       return res.status(404).json({ message: "Not found" });
+//     }
+
+//     res.json({
+//     //   orderId,
+//       store: earning?.pickupAddress?.name || "Unknown Store",
+//       totalEarnings: earning?.earnings?.totalAmount || 0,
+//       breakup: earning?.earnings || {},
+//       status: "COMPLETED",
+//       time: earning?.completedAt || null
+//     });
+
+//   } catch (err) {
+//     res.status(500).json({ message: "Internal server error" });
+//   }
+// };
+
 exports.getDeliveryEarnings = async (req, res) => {
   try {
     const riderId = req.rider._id;
     const { orderId } = req.params;
 
-    const earning = await RiderOrderEarnings.findOne({ riderId, orderId });
+    const order = await Order.findOne({ riderId, orderId });
 
-    if (!earning) {
-      return res.status(404).json({ message: "Not found" });
+    console.log("Order data:", order);
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
     }
+    console.log("Rider Earning data:", order.riderEarning.total);
+res.json({
+  orderId: order.orderId,
+  store: order.vendorShopName,
+  totalEarnings:
+    order.riderEarning?.total ??
+    order.riderEarning?.totalEarning ??
+    10,
 
-    res.json({
-      orderId,
-      store: earning.storeName,
-      totalEarnings: earning.earnings.totalAmount,
-      breakup: earning.earnings,
-      status: "COMPLETED",
-      time: earning.completedAt
-    });
+  breakup: {
+    baseFare: order.riderEarning?.baseFare || 0,
+    distanceFare: order.riderEarning?.distanceFare || 0,
+    surgePay: order.riderEarning?.surgePay || 0,
+    incentive: order.riderEarning?.incentive || 0,
+    tips: order.riderEarning?.tips || 0
+  },
+
+  status: order.orderStatus,
+  time: order.updatedAt
+});
+
 
   } catch (err) {
+    console.error("Delivery earnings error:", err);
     res.status(500).json({ message: "Internal server error" });
   }
 };
 
+
 // 5
+// exports.getWeeklyEarnings = async (req, res) => {
+//   try {
+//     const riderId = req.rider._id;
+
+//     const start = new Date();
+//     start.setDate(start.getDate() - start.getDay());
+//     start.setHours(0,0,0,0);
+
+//     const data = await RiderDailyEarnings.find({
+//       riderId,
+//       date: { $gte: start }
+//     }).sort({ date: -1 });
+//     console.log("Weekly earnings data:", data); // Debugging line
+//     res.json({
+//       weekRange: "Current Week",
+//       total: data.reduce((s, d) => s + d.totalEarnings, 0),
+//       days: data.map(d => ({
+//         day: d.date.toDateString(),
+//         orders: d.ordersCount,
+//         amount: d.totalEarnings
+//       }))
+//     });
+
+//   } catch (err) {
+//     res.status(500).json({ message: "Internal server error" });
+//   }
+// };
+
 exports.getWeeklyEarnings = async (req, res) => {
   try {
     const riderId = req.rider._id;
+    let { week, year } = req.query;
 
-    const start = new Date();
-    start.setDate(start.getDate() - start.getDay());
-    start.setHours(0,0,0,0);
+    // ---- DEFAULT CURRENT ISO WEEK ----
+    if (!week || !year) {
+      const current = getCurrentISOWeek();
+      week = current.week;
+      year = current.year;
+    }
 
-    const data = await RiderDailyEarnings.find({
+    const { start, end } = getISOWeekRange(Number(week), Number(year));
+
+    // ---- FETCH ORDERS FOR THE WEEK ----
+    const orders = await Order.find({
       riderId,
-      date: { $gte: start }
-    }).sort({ date: -1 });
-    console.log("Weekly earnings data:", data); // Debugging line
+      orderStatus: "DELIVERED",
+      updatedAt: { $gte: start, $lte: end }
+    }).sort({ updatedAt: 1 });
+
+    // ---- GROUP ORDERS BY DAY ----
+    const ordersByDay = {};
+
+    orders.forEach(order => {
+      const dayKey = new Date(order.updatedAt).toDateString();
+
+      if (!ordersByDay[dayKey]) {
+        ordersByDay[dayKey] = [];
+      }
+
+      ordersByDay[dayKey].push({
+        orderId: order.orderId,
+        amount:
+          order.riderEarning?.total ??
+          order.riderEarning?.totalEarning ??
+          0,
+        time: order.updatedAt
+      });
+    });
+
+    // ---- BUILD 7 DAYS RESPONSE (MON → SUN) ----
+    const days = [];
+
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(start);
+      day.setDate(start.getDate() + i);
+
+      const dayKey = day.toDateString();
+      const dayOrders = ordersByDay[dayKey] || [];
+
+      const totalAmount = dayOrders.reduce(
+        (sum, o) => sum + o.amount,
+        0
+      );
+
+      days.push({
+        day: day.toLocaleDateString("en-IN", { weekday: "short" }),
+        date: day.toISOString().split("T")[0],
+        ordersCount: dayOrders.length,
+        amount: totalAmount,
+        orders: dayOrders
+      });
+    }
+
     res.json({
-      weekRange: "Current Week",
-      total: data.reduce((s, d) => s + d.totalEarnings, 0),
-      days: data.map(d => ({
-        day: d.date.toDateString(),
+      week: Number(week),
+      year: Number(year),
+      weekRange: `${start.toDateString()} - ${end.toDateString()}`,
+      total: days.reduce((s, d) => s + d.amount, 0),
+      days
+    });
+
+  } catch (err) {
+    console.error("Weekly earnings error:", err);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+
+
+
+// 6
+
+exports.getEarningsHistory = async (req, res) => {
+  try {
+    const riderId = req.rider._id;
+
+    const {
+      from,
+      to,
+      page = 1,
+      limit = 10
+    } = req.query;
+
+    if (!from || !to) {
+      return res.status(400).json({
+        message: "from and to dates are required (YYYY-MM-DD)"
+      });
+    }
+
+    const startDate = new Date(from);
+    startDate.setHours(0, 0, 0, 0);
+
+    const endDate = new Date(to);
+    endDate.setHours(23, 59, 59, 999);
+
+    const skip = (page - 1) * limit;
+
+    const [records, total] = await Promise.all([
+      RiderDailyEarnings.find({
+        riderId,
+        date: { $gte: startDate, $lte: endDate }
+      })
+        .sort({ date: -1 })
+        .skip(skip)
+        .limit(Number(limit)),
+
+      RiderDailyEarnings.countDocuments({
+        riderId,
+        date: { $gte: startDate, $lte: endDate }
+      })
+    ]);
+
+    res.json({
+      page: Number(page),
+      limit: Number(limit),
+      totalRecords: total,
+      data: records.map(d => ({
+        date: d.date,
         orders: d.ordersCount,
-        amount: d.totalEarnings
+        totalEarnings: d.totalEarnings,
+        payoutStatus: d.payoutStatus
       }))
     });
 
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
 

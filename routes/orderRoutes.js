@@ -184,7 +184,7 @@ router.post("/orderCreate", createOrder);
 /**
  * @swagger
  * /api/orders/{orderId}/confirm:
- *   patch:
+ *   post:
  *     tags:
  *       - Orders
  *     summary: Confirm order and notify nearby riders
