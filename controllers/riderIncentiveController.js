@@ -87,6 +87,8 @@ const incentive = await Incentive.findOne({
 // RIDER DAILY INCENTIVE API
 // ========================================
 
+const mongoose = require("mongoose");
+
 exports.getDailyIncentive = async (req, res) => {
   try {
 
@@ -103,8 +105,10 @@ exports.getDailyIncentive = async (req, res) => {
       });
     }
 
+    const riderObjectId = new mongoose.Types.ObjectId(riderId);
+
     // -----------------------------
-    // Today's Date Filter (MATCH ORDER HISTORY)
+    // TODAY RANGE (SERVER SAFE)
     // -----------------------------
 
     const startOfDay = new Date();
@@ -114,38 +118,51 @@ exports.getDailyIncentive = async (req, res) => {
     endOfDay.setHours(23, 59, 59, 999);
 
     // -----------------------------
-    // Fetch Today's Delivered Orders
+    // FIND DELIVERED ORDERS (MULTI FIELD SUPPORT)
     // -----------------------------
 
     const orders = await Order.find({
-      riderId,
-      orderStatus: "DELIVERED",
-      createdAt: { $gte: startOfDay, $lte: endOfDay }
+      $and: [
+        {
+          $or: [
+            { rider: riderObjectId },
+            { riderId: riderObjectId },
+            { assignedRider: riderObjectId },
+            { deliveryPartner: riderObjectId }
+          ]
+        },
+        {
+          orderStatus: { $regex: /^DELIVERED$/i } // case safe
+        },
+        {
+          $or: [
+            { deliveredAt: { $gte: startOfDay, $lte: endOfDay } },
+            { updatedAt: { $gte: startOfDay, $lte: endOfDay } } // fallback
+          ]
+        }
+      ]
     });
 
-    const totalOrders = orders.length;
-
     // -----------------------------
-    // Calculate Earnings + Slots
+    // ORDER STATS
     // -----------------------------
 
-    let orderEarnings = 0;
+    let totalOrders = orders.length;
     let peakOrders = 0;
     let normalOrders = 0;
+    let orderEarnings = 0;
 
     orders.forEach(order => {
 
-      // Delivery earning only (not full order amount)
       orderEarnings += Number(order.pricing?.deliveryFee || 0);
 
-      // Slot safety
       if (order.slotType?.toUpperCase() === "PEAK") peakOrders++;
       if (order.slotType?.toUpperCase() === "NORMAL") normalOrders++;
 
     });
 
     // -----------------------------
-    // Fetch Incentive Config
+    // FETCH INCENTIVE CONFIG
     // -----------------------------
 
     const incentive = await Incentive.findOne({
@@ -156,35 +173,50 @@ exports.getDailyIncentive = async (req, res) => {
     let incentiveAmount = 0;
 
     // -----------------------------
-    // Incentive Eligibility (Internal Logic)
+    // INCENTIVE LOGIC
     // -----------------------------
 
-    if (incentive) {
+    if (incentive && incentive.slabs?.length) {
 
-      const peakSlotEligible =
-        peakOrders >= incentive.slotRules.minPeakSlots;
+      const slabBlock = incentive.slabs[0];
 
-      const normalSlotEligible =
-        normalOrders >= incentive.slotRules.minNormalSlots;
+      const peakEligible =
+        incentive.applicableSlots?.peak
+          ? peakOrders >= incentive.slotRules.minPeakSlots
+          : true;
 
-      if (
-        peakSlotEligible &&
-        normalSlotEligible &&
-        incentive.slabs?.normal?.length
-      ) {
+      const normalEligible =
+        incentive.applicableSlots?.normal
+          ? normalOrders >= incentive.slotRules.minNormalSlots
+          : true;
 
-        incentive.slabs.normal.forEach(slab => {
+      if (peakEligible && normalEligible) {
 
-          if (
-            totalOrders >= slab.minOrders &&
-            totalOrders <= slab.maxOrders
-          ) {
-            incentiveAmount = slab.rewardAmount;
-          }
+        // PEAK slabs
+        if (slabBlock.peak?.length) {
+          slabBlock.peak.forEach(slab => {
+            if (
+              totalOrders >= slab.minOrders &&
+              totalOrders <= slab.maxOrders
+            ) {
+              incentiveAmount = Math.max(incentiveAmount, slab.rewardAmount);
+            }
+          });
+        }
 
-        });
+        // NORMAL slabs
+        if (slabBlock.normal?.length) {
+          slabBlock.normal.forEach(slab => {
+            if (
+              totalOrders >= slab.minOrders &&
+              totalOrders <= slab.maxOrders
+            ) {
+              incentiveAmount = Math.max(incentiveAmount, slab.rewardAmount);
+            }
+          });
+        }
 
-        // Max reward cap protection
+        // MAX CAP
         if (
           incentive.maxRewardPerDay &&
           incentiveAmount > incentive.maxRewardPerDay
@@ -195,26 +227,36 @@ exports.getDailyIncentive = async (req, res) => {
     }
 
     // -----------------------------
-    // Final Earnings
+    // FINAL TOTAL
     // -----------------------------
 
     const totalEarnings = orderEarnings + incentiveAmount;
 
     // -----------------------------
-    // RESPONSE (NO ELIGIBLE FLAG)
+    // RESPONSE
     // -----------------------------
 
-    return res.status(200).json({
-      success: true,
-      todaySummary: {
-        totalOrders,
-        peakOrders,
-        normalOrders,
-        orderEarnings,
-        incentiveEarnings: incentiveAmount,
-        totalEarnings
-      }
-    });
+// -----------------------------
+// FINAL RESPONSE FORMAT
+// -----------------------------
+
+const eligible = incentiveAmount > 0;
+
+return res.status(200).json({
+  success: true,
+  eligible,
+  message: eligible
+    ? "Daily incentive achieved"
+    : "Daily incentive not achieved",
+  data: {
+    riderId: riderId.toString(),
+    incentiveId: incentive?._id || null,
+    title: incentive?.title || null,
+    ordersCompleted: totalOrders,
+    rewardAmount: incentiveAmount,
+    payoutTiming: incentive?.payoutTiming || null
+  }
+});
 
   } catch (error) {
 

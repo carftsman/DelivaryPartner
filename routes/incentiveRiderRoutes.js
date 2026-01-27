@@ -13,23 +13,16 @@ const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
  *   get:
  *     summary: Get Daily Incentive Status for Rider
  *     description: >
- *       Returns daily incentive eligibility and reward amount based on
- *       rider completed orders. Requires rider authentication token.
+ *       Returns today's delivered order summary and incentive eligibility
+ *       based on active DAILY_TARGET incentive rules.
+ *       Requires rider authentication token.
  *     tags:
  *       - Rider Incentives
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: ordersCompleted
- *         required: true
- *         schema:
- *           type: integer
- *           example: 12
- *         description: Total completed orders for today
  *     responses:
  *       200:
- *         description: Incentive status returned successfully
+ *         description: Daily incentive status returned successfully
  *         content:
  *           application/json:
  *             schema:
@@ -49,24 +42,24 @@ const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
  *                     data:
  *                       type: object
  *                       properties:
- *                         riderId:
- *                           type: string
- *                           example: 65fd9812abc
- *                         incentiveId:
- *                           type: string
- *                           example: 65fa77abc12
- *                         title:
- *                           type: string
- *                           example: Daily Target Bonus
- *                         ordersCompleted:
+ *                         totalOrders:
  *                           type: integer
- *                           example: 12
- *                         rewardAmount:
+ *                           example: 8
+ *                         peakOrders:
+ *                           type: integer
+ *                           example: 3
+ *                         normalOrders:
+ *                           type: integer
+ *                           example: 5
+ *                         orderEarnings:
  *                           type: number
- *                           example: 200
- *                         payoutTiming:
- *                           type: string
- *                           example: POST_SLOT
+ *                           example: 240
+ *                         incentiveEarnings:
+ *                           type: number
+ *                           example: 150
+ *                         totalEarnings:
+ *                           type: number
+ *                           example: 390
  *                 - type: object
  *                   description: Incentive Not Achieved
  *                   properties:
@@ -78,32 +71,28 @@ const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
  *                       example: false
  *                     message:
  *                       type: string
- *                       example: Daily target not achieved
+ *                       example: Daily incentive not achieved
  *                     data:
  *                       type: object
  *                       properties:
- *                         riderId:
- *                           type: string
- *                           example: 65fd9812abc
- *                         ordersCompleted:
+ *                         totalOrders:
  *                           type: integer
- *                           example: 5
- *                         rewardAmount:
+ *                           example: 4
+ *                         peakOrders:
+ *                           type: integer
+ *                           example: 1
+ *                         normalOrders:
+ *                           type: integer
+ *                           example: 3
+ *                         orderEarnings:
+ *                           type: number
+ *                           example: 120
+ *                         incentiveEarnings:
  *                           type: number
  *                           example: 0
- *       400:
- *         description: Missing or invalid ordersCompleted
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: ordersCompleted is required
+ *                         totalEarnings:
+ *                           type: number
+ *                           example: 120
  *       401:
  *         description: Unauthorized - Token missing or invalid
  *         content:
@@ -116,20 +105,7 @@ const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
  *                   example: false
  *                 message:
  *                   type: string
- *                   example: Authorization token missing
- *       404:
- *         description: No active daily incentive
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: No active daily incentive available
+ *                   example: Unauthorized rider
  *       500:
  *         description: Server error
  *         content:
@@ -142,7 +118,7 @@ const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
  *                   example: false
  *                 message:
  *                   type: string
- *                   example: Failed to fetch incentive
+ *                   example: Failed to calculate earnings
  */
 
 

@@ -46,7 +46,9 @@ dotenv.config();
 const http = require("http");
 const connectDB = require("./config/db");
 const app = require("./app");
-const {initWebSocket} = require("./webSocket");
+// const {initWebSocket} = require("./webSocket");
+const { initRiderSocket } = require("./sockets/rider.socket");
+
  
 connectDB();
  
@@ -54,7 +56,7 @@ connectDB();
 const server = http.createServer(app);
  
 // Attach WebSocket to SAME server
-initWebSocket(server);
+initRiderSocket(server);
  
 const PORT = process.env.PORT || 4000;
  
