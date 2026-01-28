@@ -11,90 +11,111 @@ const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
  * @swagger
  * /api/rider/incentives/daily:
  *   get:
- *     summary: Get Daily Incentive Status for Rider
- *     description: >
- *       Returns today's delivered order summary and incentive eligibility
- *       based on active DAILY_TARGET incentive rules.
- *       Requires rider authentication token.
+ *     summary: Get Rider Daily Incentive Progress & Reward Preview
  *     tags:
  *       - Rider Incentives
  *     security:
  *       - bearerAuth: []
+ *     description: >
+ *       Returns daily incentive configuration and rider progress.
+ *       totalRewardAmount will be greater than 0 ONLY when both PEAK and NORMAL
+ *       slot targets are completed.
+ *       potentialRewardAmount shows the maximum reward rider can earn today
+ *       even if the target is not yet completed.
+ *
  *     responses:
  *       200:
- *         description: Daily incentive status returned successfully
+ *         description: Incentive data fetched successfully
  *         content:
  *           application/json:
  *             schema:
- *               oneOf:
- *                 - type: object
- *                   description: Incentive Achieved
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *
+ *                 title:
+ *                   type: string
+ *                   example: Daily Target Bonus
+ *
+ *                 description:
+ *                   type: string
+ *                   example: Earn more with daily deliveries
+ *
+ *                 incentiveType:
+ *                   type: string
+ *                   example: DAILY_TARGET
+ *
+ *                 completedOrders:
+ *                   type: integer
+ *                   example: 15
+ *
+ *                 peakCompleted:
+ *                   type: integer
+ *                   example: 6
+ *
+ *                 normalCompleted:
+ *                   type: integer
+ *                   example: 9
+ *
+ *                 slotRules:
+ *                   type: object
  *                   properties:
- *                     success:
- *                       type: boolean
- *                       example: true
- *                     eligible:
- *                       type: boolean
- *                       example: true
- *                     message:
- *                       type: string
- *                       example: Daily incentive achieved
- *                     data:
- *                       type: object
- *                       properties:
- *                         totalOrders:
- *                           type: integer
- *                           example: 8
- *                         peakOrders:
- *                           type: integer
- *                           example: 3
- *                         normalOrders:
- *                           type: integer
- *                           example: 5
- *                         orderEarnings:
- *                           type: number
- *                           example: 240
- *                         incentiveEarnings:
- *                           type: number
- *                           example: 150
- *                         totalEarnings:
- *                           type: number
- *                           example: 390
- *                 - type: object
- *                   description: Incentive Not Achieved
+ *                     minPeakSlots:
+ *                       type: integer
+ *                       example: 2
+ *                     minNormalSlots:
+ *                       type: integer
+ *                       example: 3
+ *
+ *                 slabs:
+ *                   type: object
  *                   properties:
- *                     success:
- *                       type: boolean
- *                       example: true
- *                     eligible:
- *                       type: boolean
- *                       example: false
- *                     message:
- *                       type: string
- *                       example: Daily incentive not achieved
- *                     data:
- *                       type: object
- *                       properties:
- *                         totalOrders:
- *                           type: integer
- *                           example: 4
- *                         peakOrders:
- *                           type: integer
- *                           example: 1
- *                         normalOrders:
- *                           type: integer
- *                           example: 3
- *                         orderEarnings:
- *                           type: number
- *                           example: 120
- *                         incentiveEarnings:
- *                           type: number
- *                           example: 0
- *                         totalEarnings:
- *                           type: number
- *                           example: 120
+ *                     peak:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           minOrders:
+ *                             type: integer
+ *                             example: 5
+ *                           maxOrders:
+ *                             type: integer
+ *                             example: 8
+ *
+ *                     normal:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           minOrders:
+ *                             type: integer
+ *                             example: 8
+ *                           maxOrders:
+ *                             type: integer
+ *                             example: 12
+ *
+ *                 totalRewardAmount:
+ *                   type: number
+ *                   description: Earned reward amount (only when both targets completed)
+ *                   example: 270
+ *
+ *                 potentialRewardAmount:
+ *                   type: number
+ *                   description: Maximum reward rider can earn after reaching target
+ *                   example: 270
+ *
+ *                 eligible:
+ *                   type: boolean
+ *                   example: true
+ *
+ *                 status:
+ *                   type: string
+ *                   example: ACTIVE
+ *
  *       401:
- *         description: Unauthorized - Token missing or invalid
+ *         description: Unauthorized rider
  *         content:
  *           application/json:
  *             schema:
@@ -106,6 +127,7 @@ const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
  *                 message:
  *                   type: string
  *                   example: Unauthorized rider
+ *
  *       500:
  *         description: Server error
  *         content:
@@ -118,7 +140,7 @@ const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
  *                   example: false
  *                 message:
  *                   type: string
- *                   example: Failed to calculate earnings
+ *                   example: Failed to calculate incentive
  */
 
 

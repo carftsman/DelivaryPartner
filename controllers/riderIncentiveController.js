@@ -93,7 +93,7 @@ exports.getDailyIncentive = async (req, res) => {
   try {
 
     // -----------------------------
-    // Auth Safety
+    // AUTH SAFETY
     // -----------------------------
 
     const riderId = req.rider?._id;
@@ -108,7 +108,7 @@ exports.getDailyIncentive = async (req, res) => {
     const riderObjectId = new mongoose.Types.ObjectId(riderId);
 
     // -----------------------------
-    // TODAY RANGE (SERVER SAFE)
+    // TODAY RANGE
     // -----------------------------
 
     const startOfDay = new Date();
@@ -118,7 +118,7 @@ exports.getDailyIncentive = async (req, res) => {
     endOfDay.setHours(23, 59, 59, 999);
 
     // -----------------------------
-    // FIND DELIVERED ORDERS (MULTI FIELD SUPPORT)
+    // FETCH DELIVERED ORDERS
     // -----------------------------
 
     const orders = await Order.find({
@@ -132,12 +132,12 @@ exports.getDailyIncentive = async (req, res) => {
           ]
         },
         {
-          orderStatus: { $regex: /^DELIVERED$/i } // case safe
+          orderStatus: { $regex: /^DELIVERED$/i }
         },
         {
           $or: [
             { deliveredAt: { $gte: startOfDay, $lte: endOfDay } },
-            { updatedAt: { $gte: startOfDay, $lte: endOfDay } } // fallback
+            { updatedAt: { $gte: startOfDay, $lte: endOfDay } }
           ]
         }
       ]
@@ -150,15 +150,11 @@ exports.getDailyIncentive = async (req, res) => {
     let totalOrders = orders.length;
     let peakOrders = 0;
     let normalOrders = 0;
-    let orderEarnings = 0;
 
     orders.forEach(order => {
-
-      orderEarnings += Number(order.pricing?.deliveryFee || 0);
-
-      if (order.slotType?.toUpperCase() === "PEAK") peakOrders++;
-      if (order.slotType?.toUpperCase() === "NORMAL") normalOrders++;
-
+      const slot = order.slotType?.toUpperCase();
+      if (slot === "PEAK") peakOrders++;
+      if (slot === "NORMAL") normalOrders++;
     });
 
     // -----------------------------
@@ -170,93 +166,134 @@ exports.getDailyIncentive = async (req, res) => {
       status: "ACTIVE"
     });
 
-    let incentiveAmount = 0;
+let incentiveAmount = 0;
+let potentialRewardAmount = 0;
 
-    // -----------------------------
-    // INCENTIVE LOGIC
-    // -----------------------------
+if (incentive && incentive.slabs?.length) {
 
-    if (incentive && incentive.slabs?.length) {
+  const slabBlock = incentive.slabs[0];
 
-      const slabBlock = incentive.slabs[0];
+  const minPeakSlots = Number(incentive.slotRules?.minPeakSlots || 0);
+  const minNormalSlots = Number(incentive.slotRules?.minNormalSlots || 0);
 
-      const peakEligible =
-        incentive.applicableSlots?.peak
-          ? peakOrders >= incentive.slotRules.minPeakSlots
-          : true;
+  // -------------------------
+  // CALCULATE POTENTIAL REWARD (FROM CONFIG)
+  // -------------------------
 
-      const normalEligible =
-        incentive.applicableSlots?.normal
-          ? normalOrders >= incentive.slotRules.minNormalSlots
-          : true;
+  let maxPeakReward = 0;
+  let maxNormalReward = 0;
 
-      if (peakEligible && normalEligible) {
+  slabBlock.peak?.forEach(slab => {
+    maxPeakReward = Math.max(
+      maxPeakReward,
+      Number(slab.rewardAmount || 0)
+    );
+  });
 
-        // PEAK slabs
-        if (slabBlock.peak?.length) {
-          slabBlock.peak.forEach(slab => {
-            if (
-              totalOrders >= slab.minOrders &&
-              totalOrders <= slab.maxOrders
-            ) {
-              incentiveAmount = Math.max(incentiveAmount, slab.rewardAmount);
-            }
-          });
-        }
+  slabBlock.normal?.forEach(slab => {
+    maxNormalReward = Math.max(
+      maxNormalReward,
+      Number(slab.rewardAmount || 0)
+    );
+  });
 
-        // NORMAL slabs
-        if (slabBlock.normal?.length) {
-          slabBlock.normal.forEach(slab => {
-            if (
-              totalOrders >= slab.minOrders &&
-              totalOrders <= slab.maxOrders
-            ) {
-              incentiveAmount = Math.max(incentiveAmount, slab.rewardAmount);
-            }
-          });
-        }
+  potentialRewardAmount = maxPeakReward + maxNormalReward;
 
-        // MAX CAP
-        if (
-          incentive.maxRewardPerDay &&
-          incentiveAmount > incentive.maxRewardPerDay
-        ) {
-          incentiveAmount = incentive.maxRewardPerDay;
-        }
-      }
+  // -------------------------
+  // ACTUAL ELIGIBILITY CHECK
+  // -------------------------
+
+  const peakEligible =
+    incentive.applicableSlots?.peak
+      ? peakOrders >= minPeakSlots
+      : true;
+
+  const normalEligible =
+    incentive.applicableSlots?.normal
+      ? normalOrders >= minNormalSlots
+      : true;
+
+  let peakReward = 0;
+  let normalReward = 0;
+
+  // PEAK MATCH
+  slabBlock.peak?.forEach(slab => {
+    if (
+      peakOrders >= slab.minOrders &&
+      peakOrders <= slab.maxOrders
+    ) {
+      peakReward = Number(slab.rewardAmount);
     }
+  });
 
-    // -----------------------------
-    // FINAL TOTAL
-    // -----------------------------
+  // NORMAL MATCH
+  slabBlock.normal?.forEach(slab => {
+    if (
+      normalOrders >= slab.minOrders &&
+      normalOrders <= slab.maxOrders
+    ) {
+      normalReward = Number(slab.rewardAmount);
+    }
+  });
 
-    const totalEarnings = orderEarnings + incentiveAmount;
+  // BOTH SLOTS REQUIRED
+  if (
+    peakEligible &&
+    normalEligible &&
+    peakReward > 0 &&
+    normalReward > 0
+  ) {
+    incentiveAmount = peakReward + normalReward;
+  }
 
+  // DAILY CAP
+  if (
+    incentive.maxRewardPerDay &&
+    incentiveAmount > Number(incentive.maxRewardPerDay)
+  ) {
+    incentiveAmount = Number(incentive.maxRewardPerDay);
+  }
+}
     // -----------------------------
     // RESPONSE
     // -----------------------------
 
-// -----------------------------
-// FINAL RESPONSE FORMAT
-// -----------------------------
+    const slabBlock = incentive?.slabs?.[0] || {};
 
-const eligible = incentiveAmount > 0;
+    return res.status(200).json({
+      success: true,
 
-return res.status(200).json({
-  success: true,
-  eligible,
-  message: eligible
-    ? "Daily incentive achieved"
-    : "Daily incentive not achieved",
-  data: {
-    riderId: riderId.toString(),
-    incentiveId: incentive?._id || null,
-    title: incentive?.title || null,
-    ordersCompleted: totalOrders,
-    rewardAmount: incentiveAmount,
-    payoutTiming: incentive?.payoutTiming || null
-  }
-});
+      title: incentive?.title || null,
+      description: incentive?.description || null,
+      incentiveType: incentive?.incentiveType || null,
+
+      completedOrders: totalOrders,
+      peakCompleted: peakOrders,
+      normalCompleted: normalOrders,
+
+      slotRules: {
+        minPeakSlots: incentive?.slotRules?.minPeakSlots || 0,
+        minNormalSlots: incentive?.slotRules?.minNormalSlots || 0
+      },
+
+      slabs: {
+        peak: slabBlock.peak?.map(s => ({
+          minOrders: s.minOrders,
+          maxOrders: s.maxOrders
+        })) || [],
+
+        normal: slabBlock.normal?.map(s => ({
+          minOrders: s.minOrders,
+          maxOrders: s.maxOrders
+        })) || []
+      },
+
+      totalRewardAmount: incentiveAmount,
+      potentialRewardAmount: potentialRewardAmount,
+
+      eligible: incentiveAmount > 0,
+      status: incentive?.status || null
+    });
 
   } catch (error) {
 
@@ -264,7 +301,7 @@ return res.status(200).json({
 
     return res.status(500).json({
       success: false,
-      message: "Failed to calculate earnings"
+      message: "Failed to calculate incentive"
     });
   }
 };

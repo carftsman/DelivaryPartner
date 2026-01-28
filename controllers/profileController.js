@@ -677,6 +677,7 @@ const normalizeDate = (inputDate) => {
 
 exports.getSlotHistory = async (req, res) => {
   try {
+
     const riderId = req.rider._id;
     const { filter, date, month, year } = req.query;
 
@@ -690,12 +691,15 @@ exports.getSlotHistory = async (req, res) => {
     }
 
     else if (filter === "weekly") {
+
       const today = new Date();
       const day = today.getDay() || 7;
+
       const start = new Date(today);
       start.setDate(today.getDate() - day + 1);
 
       const weekDates = [];
+
       for (let i = 0; i < 7; i++) {
         const d = new Date(start);
         d.setDate(start.getDate() + i);
@@ -706,11 +710,13 @@ exports.getSlotHistory = async (req, res) => {
     }
 
     else if (filter === "monthly") {
+
       const y = Number(year) || new Date().getFullYear();
       const m = Number(month) || new Date().getMonth() + 1;
       const days = new Date(y, m, 0).getDate();
 
       const monthDates = [];
+
       for (let i = 1; i <= days; i++) {
         monthDates.push(
           `${y}-${String(m).padStart(2, "0")}-${String(i).padStart(2, "0")}`
@@ -737,26 +743,44 @@ exports.getSlotHistory = async (req, res) => {
       });
     }
 
-    /* ---------------- SLOT + ORDER MAPPING ---------------- */
+    /* ---------------- FETCH ALL ORDERS ONCE ---------------- */
+
+    const dates = bookings.map(b => b.date);
+
+    const dayStart = new Date(`${dates[0]}T00:00:00.000Z`);
+    const dayEnd = new Date(`${dates[dates.length - 1]}T23:59:59.999Z`);
+
+    const allOrders = await Order.find({
+      riderId,
+      createdAt: { $gte: dayStart, $lte: dayEnd }
+    }).lean();
+
+    /* ---------------- GROUP ORDERS BY DATE ---------------- */
+
+    const ordersByDate = {};
+
+    allOrders.forEach(order => {
+
+      const d = new Date(order.createdAt)
+        .toISOString()
+        .slice(0, 10);
+
+      if (!ordersByDate[d]) {
+        ordersByDate[d] = [];
+      }
+
+      ordersByDate[d].push(order);
+    });
+
+    /* ---------------- BUILD RESPONSE ---------------- */
 
     let totalEarnings = 0;
     const data = [];
 
     for (const booking of bookings) {
 
-      // ✅ DAY-WISE ORDER MATCHING (FIX)
-      const dayStart = new Date(booking.date);
-      dayStart.setHours(0, 0, 0, 0);
+      const orders = ordersByDate[booking.date] || [];
 
-      const dayEnd = new Date(booking.date);
-      dayEnd.setHours(23, 59, 59, 999);
-
-      const orders = await Order.find({
-        riderId,
-        createdAt: { $gte: dayStart, $lte: dayEnd }
-      }).lean();
-
-      // ✅ correct status fields
       const completed = orders.filter(
         o => o.orderStatus?.toUpperCase() === "DELIVERED"
       );
@@ -765,7 +789,6 @@ exports.getSlotHistory = async (req, res) => {
         o => o.orderStatus?.toUpperCase() === "CANCELED"
       );
 
-      // ✅ correct earnings field
       const slotEarnings = completed.reduce(
         (sum, o) => sum + Number(o.riderEarning?.total || 0),
         0
@@ -773,19 +796,20 @@ exports.getSlotHistory = async (req, res) => {
 
       totalEarnings += slotEarnings;
 
-// determine slot status safely
-let slotStatus = "ACTIVE";
+      // SLOT STATUS
+      let slotStatus = "ACTIVE";
 
-if (booking.status === "CANCELED") {
-  slotStatus = "CANCELED";
-} else {
-  const slotEnd = new Date(`${booking.date}T${booking.endTime}:00`);
-  const now = new Date();
+      if (booking.status === "CANCELED") {
+        slotStatus = "CANCELED";
+      } else {
 
-  if (slotEnd < now) {
-    slotStatus = "COMPLETED";
-  }
-}
+        const slotEnd = new Date(`${booking.date}T${booking.endTime}:00`);
+        const now = new Date();
+
+        if (slotEnd < now) {
+          slotStatus = "COMPLETED";
+        }
+      }
 
       data.push({
         slotBookingId: booking._id,
@@ -809,14 +833,15 @@ if (booking.status === "CANCELED") {
     });
 
   } catch (err) {
+
     console.error("Slot History Error:", err);
+
     return res.status(500).json({
       success: false,
       message: err.message
     });
   }
 };
-
 
 
 

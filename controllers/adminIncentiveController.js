@@ -56,6 +56,7 @@ exports.upsertIncentive = async (req, res) => {
       incentiveType,
       slotRules,
       slabs,
+      totalRewardAmount,
       status
     } = req.body;
 
@@ -63,10 +64,18 @@ exports.upsertIncentive = async (req, res) => {
     // Mandatory Validation
     // -----------------------------
 
-    if (!title || !description || !incentiveType || !slotRules || !slabs || !status) {
+    if (
+      !title ||
+      !description ||
+      !incentiveType ||
+      !slotRules ||
+      !slabs ||
+      totalRewardAmount === undefined ||
+      !status
+    ) {
       return res.status(400).json({
         success: false,
-        message: "All fields are mandatory"
+        message: "All fields including totalRewardAmount are mandatory"
       });
     }
 
@@ -80,7 +89,7 @@ exports.upsertIncentive = async (req, res) => {
     ) {
       return res.status(400).json({
         success: false,
-        message: "slotRules.minPeakSlots and slotRules.minNormalSlots are required"
+        message: "slotRules.minPeakSlots and minNormalSlots required"
       });
     }
 
@@ -91,57 +100,37 @@ exports.upsertIncentive = async (req, res) => {
     if (!slabs.peak || !slabs.normal) {
       return res.status(400).json({
         success: false,
-        message: "Both peak and normal slabs are required"
-      });
-    }
-
-    if (!Array.isArray(slabs.peak) || slabs.peak.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Peak slabs must be non-empty"
-      });
-    }
-
-    if (!Array.isArray(slabs.normal) || slabs.normal.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Normal slabs must be non-empty"
+        message: "Peak and Normal slabs required"
       });
     }
 
     // -----------------------------
-    // Validate Each Slab
+    // AUTO SPLIT TOTAL REWARD
     // -----------------------------
 
-    const validateSlabs = (slabArray, type) => {
-      for (const slab of slabArray) {
+    const peakReward = Math.floor(Number(totalRewardAmount) / 2);
+    const normalReward = Number(totalRewardAmount) - peakReward;
 
-        if (
-          slab.minOrders === undefined ||
-          slab.maxOrders === undefined ||
-          slab.rewardAmount === undefined
-        ) {
-          throw new Error(`${type} slab must contain minOrders, maxOrders, rewardAmount`);
-        }
+    // -----------------------------
+    // ATTACH REWARD INTERNALLY
+    // -----------------------------
 
-        if (slab.minOrders > slab.maxOrders) {
-          throw new Error(`${type} slab minOrders cannot exceed maxOrders`);
-        }
-      }
+    const mappedSlabs = {
+      peak: slabs.peak.map(s => ({
+        minOrders: s.minOrders,
+        maxOrders: s.maxOrders,
+        rewardAmount: peakReward
+      })),
+
+      normal: slabs.normal.map(s => ({
+        minOrders: s.minOrders,
+        maxOrders: s.maxOrders,
+        rewardAmount: normalReward
+      }))
     };
 
-    try {
-      validateSlabs(slabs.peak, "Peak");
-      validateSlabs(slabs.normal, "Normal");
-    } catch (err) {
-      return res.status(400).json({
-        success: false,
-        message: err.message
-      });
-    }
-
     // -----------------------------
-    // AUTO ADD applicableSlots
+    // INCENTIVE PAYLOAD
     // -----------------------------
 
     const incentivePayload = {
@@ -155,70 +144,30 @@ exports.upsertIncentive = async (req, res) => {
       },
 
       slotRules,
-      slabs,
+      slabs: [mappedSlabs],
       status
     };
 
     // -----------------------------
-    // CHECK EXISTING INCENTIVE
+    // UPSERT (ALWAYS ALLOW UPDATE)
     // -----------------------------
 
-    const existingIncentive = await Incentive.findOne({ incentiveType });
-
-    // -----------------------------
-    // SAME DAY UPDATE BLOCK
-    // -----------------------------
-
-    if (existingIncentive) {
-
-      const lastUpdated = new Date(existingIncentive.updatedAt);
-      const today = new Date();
-
-      const isSameDay =
-        lastUpdated.getDate() === today.getDate() &&
-        lastUpdated.getMonth() === today.getMonth() &&
-        lastUpdated.getFullYear() === today.getFullYear();
-
-      if (isSameDay) {
-        return res.status(403).json({
-          success: false,
-          message: "Incentive already updated today. You can update again tomorrow."
-        });
+    const incentive = await Incentive.findOneAndUpdate(
+      { incentiveType },
+      incentivePayload,
+      {
+        upsert: true,
+        new: true,
+        runValidators: true
       }
-    }
+    );
 
-    // -----------------------------
-    // UPSERT OPERATION
-    // -----------------------------
-
-    let incentive;
-
-    if (existingIncentive) {
-
-      incentive = await Incentive.findOneAndUpdate(
-        { incentiveType },
-        incentivePayload,
-        { new: true }
-      );
-
-      return res.status(200).json({
-        success: true,
-        action: "UPDATED",
-        message: "Incentive updated successfully",
-        data: incentive
-      });
-
-    } else {
-
-      incentive = await Incentive.create(incentivePayload);
-
-      return res.status(201).json({
-        success: true,
-        action: "CREATED",
-        message: "Incentive created successfully",
-        data: incentive
-      });
-    }
+    return res.status(200).json({
+      success: true,
+      message: "Incentive saved successfully",
+      totalRewardAmount,
+      data: incentive
+    });
 
   } catch (error) {
 

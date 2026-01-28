@@ -833,48 +833,50 @@ router.get(
  * @swagger
  * /api/profile/slots/history:
  *   get:
+ *     summary: Get Rider Slot History & Earnings
  *     tags:
  *       - Profile
- *     summary: Get rider slot history
- *     description: >
- *       Fetches slot history for the authenticated rider with earnings and order statistics.
- *       Supports daily, weekly, and monthly filters.
- *       Orders are calculated day-wise for each slot.
  *     security:
  *       - bearerAuth: []
+ *     description: >
+ *       Returns rider slot booking history along with completed orders,
+ *       canceled orders and total earnings.
+ *       Supports daily, weekly and monthly filters.
  *
  *     parameters:
  *       - in: query
  *         name: filter
+ *         required: false
  *         schema:
  *           type: string
  *           enum: [daily, weekly, monthly]
- *         required: false
- *         description: Filter type for slot history
+ *         description: Filter slot history by date range
+ *         example: weekly
  *
  *       - in: query
  *         name: date
+ *         required: false
  *         schema:
  *           type: string
- *           example: "2026-01-05"
- *         required: false
- *         description: Specific date for daily filter (YYYY-MM-DD)
+ *           format: date
+ *         description: Required when filter=daily (YYYY-MM-DD)
+ *         example: 2026-01-27
  *
  *       - in: query
  *         name: month
+ *         required: false
  *         schema:
  *           type: integer
- *           example: 1
- *         required: false
- *         description: Month number for monthly filter (1-12)
+ *         description: Required when filter=monthly (1-12)
+ *         example: 1
  *
  *       - in: query
  *         name: year
+ *         required: false
  *         schema:
  *           type: integer
- *           example: 2026
- *         required: false
- *         description: Year for monthly filter
+ *         description: Required when filter=monthly (YYYY)
+ *         example: 2026
  *
  *     responses:
  *       200:
@@ -887,15 +889,19 @@ router.get(
  *                 success:
  *                   type: boolean
  *                   example: true
+ *
  *                 filter:
  *                   type: string
- *                   example: daily
+ *                   example: weekly
+ *
  *                 totalSlots:
  *                   type: integer
- *                   example: 1
+ *                   example: 5
+ *
  *                 totalEarnings:
  *                   type: number
- *                   example: 60
+ *                   example: 650
+ *
  *                 data:
  *                   type: array
  *                   items:
@@ -903,38 +909,69 @@ router.get(
  *                     properties:
  *                       slotBookingId:
  *                         type: string
- *                         example: "695b541094c6d3aa76cada71"
+ *                         example: 65cfd123ab91e1208e22d11
+ *
  *                       date:
  *                         type: string
- *                         example: "2026-01-05"
+ *                         format: date
+ *                         example: 2026-01-25
+ *
  *                       startTime:
  *                         type: string
- *                         example: "18:00"
+ *                         example: "09:00"
+ *
  *                       endTime:
  *                         type: string
- *                         example: "20:00"
+ *                         example: "13:00"
+ *
  *                       slotStatus:
  *                         type: string
  *                         enum: [ACTIVE, COMPLETED, CANCELED]
  *                         example: COMPLETED
+ *
  *                       totalOrders:
  *                         type: integer
- *                         example: 1
+ *                         example: 12
+ *
  *                       completedOrders:
  *                         type: integer
- *                         example: 1
+ *                         example: 10
+ *
  *                       canceledOrders:
  *                         type: integer
- *                         example: 0
+ *                         example: 2
+ *
  *                       slotEarnings:
  *                         type: number
- *                         example: 60
+ *                         example: 180
  *
  *       401:
- *         description: Unauthorized - Invalid or missing token
+ *         description: Unauthorized rider
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Unauthorized
  *
  *       500:
- *         description: Internal server error
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Internal server error
  */
 
 router.get(
