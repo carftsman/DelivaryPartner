@@ -18,6 +18,8 @@ const earningsRoutes = require("./routes/earningsRoutes");
 const adminRouterIncentives = require("./routes/adminInccentiveRoutes");
 const riderIncentiveRoutes = require("./routes/incentiveRiderRoutes");
 const webIncentiveRoutes = require("./routes/order.routes");
+
+
 // const webRiderRoutes = require("./routes/rider.routes");
 
 const riderEarningsRoutes = require('./routes/riderEarningsRoutes')
@@ -79,6 +81,7 @@ app.use("/api/admin/incentives",adminRouterIncentives);
 
 app.use("/api/rider", kitRouter);
 app.use("/api/slots", slotRouter);
+app.use("/api/rider/assets", require("./routes/riderAssetsRoutes"));
 
 // app.use("/api/offline-stores", offlineStoreRoute);
 
