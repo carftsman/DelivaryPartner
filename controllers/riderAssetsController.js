@@ -1,88 +1,73 @@
 const RiderAssets = require("../models/RiderAsset");
-
-/**
- * Raise Issue for selected assets
- * POST /api/rider/assets/issues
- */
 exports.raiseAssetIssue = async (req, res) => {
   try {
     const riderId = req.rider._id;
     const { assets, issueType, description } = req.body;
 
-    /**
-     * assets = [
-     *   { assetType: "T_SHIRT", assetName: "T-Shirt Size L" },
-     *   { assetType: "BAG", assetName: "Delivery Bag - Large" }
-     * ]
-     */
-
     if (!assets || !assets.length) {
       return res.status(400).json({
+        success: false,
         message: "Please select at least one asset",
       });
     }
 
     const riderAssets = await RiderAssets.findOne({ riderId });
-
     if (!riderAssets) {
       return res.status(404).json({
-        message: "Assets not found for rider",
+        success: false,
+        message: "Assets not found",
       });
     }
 
-    const issuesToAdd = assets.map((item) => ({
-      assetType: item.assetType,
-      assetName: item.assetName,
-      issueType: issueType || "OTHER",
-      description,
-    }));
+    for (const item of assets) {
+      // 1️⃣ Find asset
+      const asset = riderAssets.assets.find(
+        (a) =>
+          a.assetType === item.assetType &&
+          a.assetName === item.assetName
+      );
 
-    riderAssets.issues.push(...issuesToAdd);
+      if (!asset) continue;
+
+      // 2️⃣ Check if OPEN issue already exists
+      const openIssueExists = riderAssets.issues.some(
+        (i) =>
+          i.assetType === item.assetType &&
+          i.assetName === item.assetName &&
+          i.status === "OPEN"
+      );
+
+      if (openIssueExists) {
+        return res.status(400).json({
+          success: false,
+          message: `Issue already raised for ${item.assetName}`,
+        });
+      }
+
+      // 3️⃣ Create issue
+      riderAssets.issues.push({
+        assetType: item.assetType,
+        assetName: item.assetName,
+        issueType: issueType || "OTHER",
+        description,
+        status: "OPEN",
+      });
+
+      // 4️⃣ Mark asset BAD
+      asset.condition = "BAD";
+    }
+
     await riderAssets.save();
 
     return res.status(201).json({
+      success: true,
       message: "Issue raised successfully",
-      issuesRaised: issuesToAdd.length,
     });
   } catch (error) {
-    console.error("Raise Asset Issue Error:", error);
+    console.error("Raise Issue Error:", error);
     return res.status(500).json({
-      message: "Something went wrong",
-    });
-  };
-
-
-
-};
-
-
-  exports.getRiderAssets = async (req, res) => {
-  try {
-    const riderId = req.rider._id;
-
-    const data = await RiderAssets.findOne({ riderId }).lean();
-
-    if (!data) {
-      return res.json({
-        totalAssets: 0,
-        issues: 0,
-        assets: [],
-      });
-    }
-
-    const totalAssets = data.assets.length;
-    const openIssues = data.issues.filter(
-      (i) => i.status !== "RESOLVED"
-    ).length;
-
-    return res.json({
-      totalAssets,
-      issues: openIssues,
-      assets: data.assets,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      message: "Failed to fetch assets",
+      success: false,
+      message: "Failed to raise issue",
     });
   }
 };

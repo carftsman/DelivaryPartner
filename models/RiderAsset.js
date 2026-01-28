@@ -25,9 +25,18 @@ const RiderAssetsSchema = new Schema(
           enum: ["ISSUED", "RETURNED", "LOST"],
           default: "ISSUED",
         },
-        returnedDate: Date,
-      },
-    ],
+  
+
+    condition: {
+      type: String,
+      enum: ["GOOD", "BAD"],
+      default: "GOOD",
+    },
+
+    returnedDate: Date,
+  },
+],
+
 
     /** 🔴 NEW: Issues raised by rider */
     issues: [

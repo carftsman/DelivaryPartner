@@ -192,80 +192,131 @@ exports.getBankDetails = async (req, res) => {
     });
   }
 };
+
+
+
+
+
+
+
 exports.getMyAssetsSummary = async (req, res) => {
   try {
     const riderId = req.rider._id;
 
     const doc = await RiderAssets.findOne({ riderId }).lean();
 
-    if (!doc || !doc.assets || doc.assets.length === 0) {
+    if (!doc) {
       return res.status(200).json({
         success: true,
         data: {
-          totalAssets: 0,
           badConditionCount: 0,
-          canRaiseRequest: false,
-          assets: [],
+          issues: [],
         },
       });
     }
 
-    let totalAssets = 0;
-    let badConditionCount = 0;
+    // 🔹 Count BAD assets
+    const badConditionCount = (doc.assets || []).reduce(
+      (count, asset) => asset.condition === "BAD" ? count + 1 : count,
+      0
+    );
 
-    const formattedAssets = doc.assets.map(asset => {
-      const qty = asset.quantity || 1;
-
-      totalAssets += qty;
-
-      if (asset.condition === "BAD") {
-        badConditionCount += qty;
-      }
-
-      return {
-        assetId: asset._id,
-        assetType: asset.assetType,
-        assetName: asset.assetName,
-        quantity: qty,
-        condition: asset.condition,
-        issuedDate: asset.issuedDate,
-        canRaiseRequest: asset.condition === "BAD",
-      };
-    });
-
-    // return res.status(200).json({
-    //   success: true,
-    //   data: {
-    //     totalAssets,
-    //     badConditionCount,
-    //     canRaiseRequest: badConditionCount > 0,
-    //     assets: formattedAssets,
-
-
-        
-    //   },
-    // });
-
+    // 🔹 OPTIONAL: return only OPEN issues
+    const issues = (doc.issues || []).filter(
+      (issue) => issue.status === "OPEN"
+    );
 
     return res.status(200).json({
-  success: true,
-  data: {
-    totalProducts: formattedAssets.length,
-    totalAssets,
-    badConditionCount,
-    canRaiseRequest: badConditionCount > 0,
-    assets: formattedAssets
-  }
-});
-
+      success: true,
+      data: {
+        badConditionCount,
+        issues,
+      },
+    });
   } catch (error) {
     console.error("Assets Summary Error:", error);
     return res.status(500).json({
       success: false,
-      message: "Failed to fetch asset summary",
+      message: "Failed to fetch asset issues",
     });
   }
 };
+
+
+// exports.getMyAssetsSummary = async (req, res) => {
+//   try {
+//     const riderId = req.rider._id;
+
+//     const doc = await RiderAssets.findOne({ riderId }).lean();
+
+//     if (!doc || !doc.assets || doc.assets.length === 0) {
+//       return res.status(200).json({
+//         success: true,
+//         data: {
+//           totalAssets: 0,
+//           badConditionCount: 0,
+//           canRaiseRequest: false,
+//           assets: [],
+//         },
+//       });
+//     }
+
+//     let totalAssets = 0;
+//     let badConditionCount = 0;
+
+//     const formattedAssets = doc.assets.map(asset => {
+//       const qty = asset.quantity || 1;
+
+//       totalAssets += qty;
+
+//       if (asset.condition === "BAD") {
+//         badConditionCount += qty;
+//       }
+
+//       return {
+//         assetId: asset._id,
+//         assetType: asset.assetType,
+//         assetName: asset.assetName,
+//         quantity: qty,
+//         condition: asset.condition,
+//         issuedDate: asset.issuedDate,
+//         canRaiseRequest: asset.condition === "BAD",
+//       };
+//     });
+
+//     // return res.status(200).json({
+//     //   success: true,
+//     //   data: {
+//     //     totalAssets,
+//     //     badConditionCount,
+//     //     canRaiseRequest: badConditionCount > 0,
+//     //     assets: formattedAssets,
+
+
+        
+//     //   },
+//     // });
+
+
+//     return res.status(200).json({
+//   success: true,
+//   data: {
+//     totalProducts: formattedAssets.length,
+//     totalAssets,
+//     badConditionCount,
+//     canRaiseRequest: badConditionCount > 0,
+//     assets: formattedAssets
+//   }
+// });
+
+//   } catch (error) {
+//     console.error("Assets Summary Error:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch asset summary",
+//     });
+//   }
+// };
 exports.getWalletDetails = async (req, res) => {
   try {
     const riderId = req.rider._id;

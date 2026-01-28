@@ -277,20 +277,13 @@ router.get("/bank-details", riderAuthMiddleWare, getBankDetails);
  * @swagger
  * /api/profile/assets:
  *   get:
- *     tags:
- *       - Profile
- *     summary: Get rider asset summary
- *     description: >
- *       Fetches the logged-in rider's asset summary using JWT token.
- *       Returns total assets count, number of assets in BAD condition,
- *       whether the rider can raise a request, and detailed asset list
- *       with issued date and condition.
+ *     summary: Get rider asset issues and bad condition count
+ *     tags: [Rider Assets]
  *     security:
  *       - bearerAuth: []
- *
  *     responses:
  *       200:
- *         description: Rider asset summary fetched successfully
+ *         description: Asset issues fetched successfully
  *         content:
  *           application/json:
  *             schema:
@@ -302,79 +295,46 @@ router.get("/bank-details", riderAuthMiddleWare, getBankDetails);
  *                 data:
  *                   type: object
  *                   properties:
- *                     totalAssets:
- *                       type: number
- *                       example: 3
  *                     badConditionCount:
- *                       type: number
- *                       example: 1
- *                     canRaiseRequest:
- *                       type: boolean
- *                       example: true
- *                     assets:
+ *                       type: integer
+ *                       example: 2
+ *                     issues:
  *                       type: array
  *                       items:
  *                         type: object
  *                         properties:
- *                           assetId:
- *                             type: string
- *                             example: "661a9f8c1234567890abcd"
  *                           assetType:
  *                             type: string
- *                             example: HELMET
+ *                             enum: [T_SHIRT, BAG, HELMET, JACKET, ID_CARD, OTHER]
+ *                             example: BAG
  *                           assetName:
  *                             type: string
- *                             example: Steelbird Helmet
- *                           quantity:
- *                             type: number
- *                             example: 1
- *                           condition:
+ *                             example: Delivery Bag - Large
+ *                           issueType:
  *                             type: string
- *                             example: BAD
- *                           issuedDate:
+ *                             enum: [DAMAGED, LOST, WRONG_SIZE, OTHER]
+ *                             example: DAMAGED
+ *                           description:
+ *                             type: string
+ *                             example: Bag zip is broken
+ *                           status:
+ *                             type: string
+ *                             enum: [OPEN, IN_PROGRESS, RESOLVED]
+ *                             example: OPEN
+ *                           raisedAt:
  *                             type: string
  *                             format: date-time
- *                             example: "2026-01-02T10:00:00.000Z"
- *                           canRaiseRequest:
- *                             type: boolean
- *                             example: true
- *
  *       401:
- *         description: Unauthorized – invalid or missing token
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Unauthorized
- *
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Failed to fetch asset summary
+ *         description: Unauthorized
  */
 
- 
  
 router.get(
   "/assets",
   riderAuthMiddleWare,
   getMyAssetsSummary
 );
+
 /**
  * @swagger
  * /api/profile/documents:
