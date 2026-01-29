@@ -841,7 +841,9 @@ exports.getCurrentSlot = async (req, res) => {
       });
     }
 
-    const now = new Date();
+    const now = new Date(
+      new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
+    );
     const today = now.toISOString().split("T")[0]; // "2025-12-27"
     // console.log("Today's date:", today);
     // Fetch today's slot document
@@ -878,7 +880,7 @@ exports.getCurrentSlot = async (req, res) => {
     }
 
     // testing
-    
+
     // const todayStr = new Date().toISOString().split("T")[0];
     // console.log("Today String:", todayStr);
     // console.log("Upcoming Slot ID:", today);
