@@ -161,6 +161,7 @@ exports.updateProfile = async (req, res) => {
       });
     }
 
+
     return res.status(200).json({
       success: true,
       message: "Profile updated successfully",
@@ -1105,6 +1106,80 @@ exports.addOrUpdateBankDetails = async (req, res) => {
   }
 };
 
+exports.getMyAssets = async (req, res) => {
+  try {
+    const riderId = req.rider._id;
+ 
+    const doc = await RiderAssets.findOne({ riderId }).lean();
+ 
+    if (!doc || !doc.assets || doc.assets.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          totalAssets: 0,
+          badConditionCount: 0,
+          canRaiseRequest: false,
+          assets: [],
+        },
+      });
+    }
+ 
+    let totalAssets = 0;
+    let badConditionCount = 0;
+ 
+    const formattedAssets = doc.assets.map(asset => {
+      const qty = asset.quantity || 1;
+ 
+      totalAssets += qty;
+ 
+      if (asset.condition === "BAD") {
+        badConditionCount += qty;
+      }
+ 
+      return {
+        assetId: asset._id,
+        assetType: asset.assetType,
+        assetName: asset.assetName,
+        quantity: qty,
+        condition: asset.condition,
+        issuedDate: asset.issuedDate,
+        canRaiseRequest: asset.condition === "BAD",
+      };
+    });
+ 
+    // return res.status(200).json({
+    //   success: true,
+    //   data: {
+    //     totalAssets,
+    //     badConditionCount,
+    //     canRaiseRequest: badConditionCount > 0,
+    //     assets: formattedAssets,
+ 
+ 
+       
+    //   },
+    // });
+ 
+ 
+    return res.status(200).json({
+  success: true,
+  data: {
+    totalProducts: formattedAssets.length,
+    totalAssets,
+    badConditionCount,
+    canRaiseRequest: badConditionCount > 0,
+    assets: formattedAssets
+  }
+});
+ 
+  } catch (error) {
+    console.error("Assets Summary Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch asset summary",
+    });
+  }
+};
  
 
 

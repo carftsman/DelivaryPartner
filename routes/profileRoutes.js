@@ -14,7 +14,8 @@ const { updateProfile,
   getRiderOrderHistory,
   getSlotHistory,
   addOrUpdateBankDetails,
-  getMyAssetsSummary } = require("../controllers/profileController");
+  getMyAssetsSummary,
+getMyAssets } = require("../controllers/profileController");
 
 /**
  * @swagger
@@ -334,6 +335,104 @@ router.get(
   riderAuthMiddleWare,
   getMyAssetsSummary
 );
+/**
+ * @swagger
+ * /api/profile/totalassets:
+ *   get:
+ *     summary: Get rider asset summary
+ *     description: Fetch all assets issued to the logged-in rider along with summary counts and condition status.
+ *     tags:
+ *       - Profile
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Assets fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     totalProducts:
+ *                       type: number
+ *                       example: 2
+ *                     totalAssets:
+ *                       type: number
+ *                       example: 3
+ *                     badConditionCount:
+ *                       type: number
+ *                       example: 1
+ *                     canRaiseRequest:
+ *                       type: boolean
+ *                       example: true
+ *                     assets:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           assetId:
+ *                             type: string
+ *                             example: "661abc1234567890"
+ *                           assetType:
+ *                             type: string
+ *                             example: "BAG"
+ *                           assetName:
+ *                             type: string
+ *                             example: "Delivery Bag XL"
+ *                           quantity:
+ *                             type: number
+ *                             example: 1
+ *                           condition:
+ *                             type: string
+ *                             example: "BAD"
+ *                           issuedDate:
+ *                             type: string
+ *                             format: date-time
+ *                             example: "2026-01-29T10:30:00.000Z"
+ *                           canRaiseRequest:
+ *                             type: boolean
+ *                             example: true
+ *
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Authorization token missing
+ *
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Failed to fetch asset summary
+ */
+
+router.get(
+  "/totalassets",
+  riderAuthMiddleWare,
+  getMyAssets
+);
 
 /**
  * @swagger
@@ -643,7 +742,7 @@ router.put(
 );
 /**
  * @swagger
- * /api/rider/orders/history:
+ * /api/profile/orders/history:
  *   get:
  *     tags:
  *       - Profile

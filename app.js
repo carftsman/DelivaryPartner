@@ -129,6 +129,7 @@ app.use("/api/rider/notifications", fcmTokenRoutes);
 
 
 
+
 app.get("/", (req, res) => {
   res.send("Vega Delivery Partner API Running. Open /api-docs");
 });
