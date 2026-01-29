@@ -720,6 +720,22 @@ exports.bookSlot = async (req, res) => {
       );
     }
 
+    // FCM Notification
+    const fcmService = require("../helpers/fcmService");
+     console.log("Rider FCM Token:", rider?.fcmToken);
+    // 3. Send notification
+    if (rider?.fcmToken) {
+      await fcmService.sendToDevice({
+        token: rider.fcmToken,
+        title: "Slot Booked ✅",
+        body: `Your slot  is booked`,
+        data: {
+          type: "SLOT_BOOKED",
+        },
+      });
+    }
+
+
     return res.json({
       success: true,
       message: "Slots booked successfully",

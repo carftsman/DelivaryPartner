@@ -10,6 +10,8 @@ const sendToDevice = async ({ token, title, body, data = {} }) => {
   return admin.messaging().send(message);
 };
 
+// this is use full for : Same rider logged in on 2 phones (don't use this presently becuase of in schema we have fcmToken as single string)
+
 const sendToMultiple = async ({ tokens, title, body, data = {} }) => {
   const message = {
     tokens,
