@@ -877,13 +877,31 @@ exports.getCurrentSlot = async (req, res) => {
       });
     }
 
+    // testing
+    
+    // const todayStr = new Date().toISOString().split("T")[0];
+    // console.log("Today String:", todayStr);
+    // console.log("Upcoming Slot ID:", today);
+
+    const isBooked = await SlotBooking.exists({
+      riderId: req.rider._id,
+      slotId: upcomingSlot.slotId,
+      date: today,      //STRING MATCH
+      status: "BOOKED"
+    });
+
+    console.log("Is Booked:", !!isBooked);
+
+
+
     return res.json({
       success: true,
-      message: "Upcoming slot for today",
+      message: !!isBooked ? "Slot is already booked" : "Present slot",
       date: today,
       data: {
         daySlotId: daySlot._id,
-        slot: upcomingSlot
+        slot: upcomingSlot,
+        isBooked: !!isBooked
       }
     });
 

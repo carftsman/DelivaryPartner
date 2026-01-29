@@ -103,39 +103,128 @@ exports.getWeeklyChart = async (req, res) => {
 
 // 3 Daily earnings list
 
+// exports.getDailyEarnings = async (req, res) => {
+//     // console.log("hited daily earnings controller");
+//     // console.log("Request query:", req.query); // Debugging line
+//     // console.log("Rider ID:", req.rider._id); // Debugging line
+//   try {
+//     const riderId = req.rider._id;
+//     const date = new Date(req.query.date);
+//     date.setHours(0,0,0,0);
+
+//     const daily = await RiderDailyEarnings.findOne({ riderId, date });
+//     const orders = await RiderOrderEarnings.find({
+//       riderId,
+//       completedAt: {
+//         $gte: date,
+//         $lte: new Date(date.getTime() + 86400000)
+//       }
+//     }).sort({ completedAt: -1 });
+
+//     res.json({
+//       date,
+//       totalEarnings: daily?.totalEarnings || 0,
+//       items: orders.map(o => ({
+//         type: "DELIVERY",
+//         orderId: o.orderId,
+//         amount: o.earnings.totalAmount,
+//         time: o.completedAt
+//       }))
+//     });
+
+//   } catch (err) {
+//     res.status(500).json({ message: "Internal server error" });
+//   }
+// };
+
 exports.getDailyEarnings = async (req, res) => {
-    console.log("hited daily earnings controller");
-    console.log("Request query:", req.query); // Debugging line
-    console.log("Rider ID:", req.rider._id); // Debugging line
   try {
     const riderId = req.rider._id;
-    const date = new Date(req.query.date);
-    date.setHours(0,0,0,0);
 
-    const daily = await RiderDailyEarnings.findOne({ riderId, date });
+    let year, month, day;
+
+    // -----------------------------
+    //SAFE DATE PARSING (LOCAL)
+    // -----------------------------
+    if (req.query.date) {
+      // Expecting YYYY-MM-DD
+      const parts = req.query.date.split("-").map(Number);
+
+      if (parts.length !== 3) {
+        return res.status(400).json({
+          message: "Invalid date format. Use YYYY-MM-DD"
+        });
+      }
+
+      [year, month, day] = parts;
+
+      if (!year || !month || !day) {
+        return res.status(400).json({
+          message: "Invalid date format. Use YYYY-MM-DD"
+        });
+      }
+    } else {
+      const today = new Date();
+      year = today.getFullYear();
+      month = today.getMonth() + 1;
+      day = today.getDate();
+    }
+
+    // -----------------------------
+    //CREATE LOCAL DAY RANGE
+    // -----------------------------
+    const baseDate = new Date(year, month - 1, day);
+
+    const startOfDay = new Date(baseDate);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(baseDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    // -----------------------------
+    //FETCH DAILY AGGREGATE
+    // -----------------------------
+    const daily = await RiderDailyEarnings.findOne({
+      riderId,
+      date: startOfDay
+    });
+
+    // -----------------------------
+    // FETCH ORDERS FOR THE DAY
+    // -----------------------------
     const orders = await RiderOrderEarnings.find({
       riderId,
       completedAt: {
-        $gte: date,
-        $lte: new Date(date.getTime() + 86400000)
+        $gte: startOfDay,
+        $lte: endOfDay
       }
     }).sort({ completedAt: -1 });
 
+    // -----------------------------
+    // FORMAT DATE FOR UI
+    // -----------------------------
+    const responseDate = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+
+    // -----------------------------
+    // RESPONSE
+    // -----------------------------
     res.json({
-      date,
+      date: responseDate,
       totalEarnings: daily?.totalEarnings || 0,
       items: orders.map(o => ({
         type: "DELIVERY",
         orderId: o.orderId,
-        amount: o.earnings.totalAmount,
+        amount: o.earnings?.totalAmount || 0,
         time: o.completedAt
       }))
     });
 
   } catch (err) {
+    console.error("Daily earnings error:", err);
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
 
 // 4
 

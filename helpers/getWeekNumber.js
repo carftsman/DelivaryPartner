@@ -42,20 +42,48 @@ function getISOWeekRange(week, year) {
 }
 
 
+// function getCurrentISOWeek() {
+//   const today = new Date();
+//   const temp = new Date(today);
+//   console.log("Today's Date:", temp);
+//   temp.setHours(0, 0, 0, 0);
+
+//   // Thursday determines the week
+//   temp.setDate(temp.getDate() + 3 - ((temp.getDay() + 6) % 7));
+
+//   const week1 = new Date(temp.getFullYear(), 0, 4);
+//   console.log("Week 1 Reference Date:", week1);
+//   return {
+//     week: Math.ceil((((temp - week1) / 86400000) + 1) / 7),
+//     year: temp.getFullYear()
+//   };
+// }
+
 function getCurrentISOWeek() {
-  const today = new Date();
-  const temp = new Date(today);
-  temp.setHours(0, 0, 0, 0);
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
 
-  // Thursday determines the week
-  temp.setDate(temp.getDate() + 3 - ((temp.getDay() + 6) % 7));
+  // ISO week date weeks start on Monday, so correct day number
+  const dayNum = (date.getDay() + 6) % 7;
 
-  const week1 = new Date(temp.getFullYear(), 0, 4);
-  return {
-    week: Math.ceil((((temp - week1) / 86400000) + 1) / 7),
-    year: temp.getFullYear()
-  };
+  // Set date to Thursday of current week
+  date.setDate(date.getDate() - dayNum + 3);
+
+  // ISO year is the year of the Thursday
+  const isoYear = date.getFullYear();
+
+  // Find first Thursday of ISO year
+  const firstThursday = new Date(isoYear, 0, 4);
+  firstThursday.setDate(firstThursday.getDate() - ((firstThursday.getDay() + 6) % 7) + 3);
+
+  // Calculate week number
+  const week = 1 + Math.round(
+    (date - firstThursday) / (7 * 24 * 60 * 60 * 1000)
+  );
+
+  return { week, year: isoYear };
 }
+
 
 
 

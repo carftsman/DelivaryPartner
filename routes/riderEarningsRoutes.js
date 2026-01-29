@@ -123,10 +123,11 @@ riderEarningsRouter.get("/new/weekly-chart", riderAuthMiddleWare, getWeeklyChart
  * @swagger
  * /api/rider/earnings/new/daily:
  *   get:
- *     summary: Get rider daily earnings
+ *     summary: Get rider daily earnings (timezone-safe)
  *     description: >
  *       Returns daily earnings summary and delivery-wise earnings
- *       for the given date for the logged-in rider.
+ *       for the given date (local day). If no date is provided,
+ *       earnings for the current day are returned.
  *     tags:
  *       - Rider Earnings
  *     security:
@@ -134,11 +135,11 @@ riderEarningsRouter.get("/new/weekly-chart", riderAuthMiddleWare, getWeeklyChart
  *     parameters:
  *       - in: query
  *         name: date
- *         required: true
- *         description: Date for which earnings are required (YYYY-MM-DD)
+ *         required: false
+ *         description: Date for which earnings are required (YYYY-MM-DD). If not provided, current date is used.
  *         schema:
  *           type: string
- *           example: 2026-01-22
+ *           example: 2026-01-28
  *     responses:
  *       200:
  *         description: Daily earnings fetched successfully
@@ -149,12 +150,14 @@ riderEarningsRouter.get("/new/weekly-chart", riderAuthMiddleWare, getWeeklyChart
  *               properties:
  *                 date:
  *                   type: string
- *                   example: 2026-01-22T00:00:00.000Z
+ *                   description: Local date for which earnings are returned
+ *                   example: 2026-01-28
  *                 totalEarnings:
  *                   type: number
  *                   example: 450
  *                 items:
  *                   type: array
+ *                   description: List of delivery earnings for the day
  *                   items:
  *                     type: object
  *                     properties:
@@ -169,9 +172,9 @@ riderEarningsRouter.get("/new/weekly-chart", riderAuthMiddleWare, getWeeklyChart
  *                         example: 60
  *                       time:
  *                         type: string
- *                         example: 2026-01-22T14:30:00.000Z
+ *                         example: 2026-01-28T14:30:00.000Z
  *       400:
- *         description: Invalid or missing date query parameter
+ *         description: Invalid date format (expected YYYY-MM-DD)
  *       401:
  *         description: Unauthorized – rider token missing or invalid
  *       500:

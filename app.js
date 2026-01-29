@@ -31,7 +31,8 @@ const issueRouter =  require("./routes/issueRoutes")
 
 const pricingConfigRoutes = require("./routes/pricingConfigRoutes");
 
-
+const notificationRoutes = require("./routes/notificationRoutes");
+const fcmTokenRoutes = require("./routes/fcmTokenRoutes");
 
 
 // const offlineStoreRoute = require("./routes/offlineStoreRoute");
@@ -119,6 +120,11 @@ app.use("/api/web",webIncentiveRoutes)
 
 
 app.use("/api", pricingConfigRoutes);
+
+
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/rider/notifications", fcmTokenRoutes);
+
 
 
 

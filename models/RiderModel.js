@@ -622,6 +622,12 @@ currentOrderId: {
   ref: "Order",
   default: null
 },
+
+fcmToken: {
+  type: String,
+  default: null,
+  index: true
+}
  
  
   },
