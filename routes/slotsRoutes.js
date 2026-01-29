@@ -344,6 +344,8 @@ slotRouter.delete("/cancel/:bookingId", riderAuthMiddleWare, cancelSlot);
  *     summary: Get the next upcoming slot for today
  *     tags:
  *       - Slots
+ *     security:
+ *       - bearerAuth: []
  *     description: >
  *       Returns the next available upcoming ACTIVE slot for the current date based on the user's local time.
  *       If no upcoming slot is found, response will return `data: null`.
