@@ -558,6 +558,13 @@ location: {
       totalEarned: { type: Number, default: 0 },
       totalWithdrawn: { type: Number, default: 0 }
     },
+
+    // 🔹 NEW: COD Cash Tracking
+    cashInHand: {
+      balance: { type: Number, default: 0 },   // COD cash
+      limit: { type: Number, default: 2500 },  // max allowed
+      lastUpdatedAt: Date
+    },
  
  
     kitDeliveryAddress: {
@@ -602,7 +609,8 @@ deliveryStatus: {
       "MANUAL_OFF",
       "KYC_PENDING",
       "ACCOUNT_SUSPENDED",
-      "OUT_OF_SERVICE_AREA"
+      "OUT_OF_SERVICE_AREA",
+      "COD_LIMIT_EXCEEDED"
     ],
     default: "MANUAL_OFF"
   },

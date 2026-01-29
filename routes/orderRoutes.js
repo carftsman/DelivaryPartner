@@ -8,7 +8,12 @@ const {
    acceptOrder,
    rejectOrder,
    getOrderDetails,
-  // pickupOrder,
+   pickupOrder,
+   deliverOrder,
+    cancelOrder,
+    getOrdersByRider,
+    getDeliveredOrdersByRider,
+    getCancelledOrdersByRider
 } = require("../controllers/orderController");
 
 // ================================
@@ -571,6 +576,344 @@ router.get("/:orderId/details", getOrderDetails);
 // ================================
 // PICKUP ORDER
 // ================================
-// router.patch("/:orderId/pickup", pickupOrder);
+
+/**
+ * @swagger
+ * /api/orders/{orderId}/pickup:
+ *   patch:
+ *     tags:
+ *       - Orders
+ *     summary: Rider picks up the order
+ *     description: >
+ *       This API is used by the assigned rider to mark the order as picked up
+ *       after reaching the pickup location.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         example: ORD-80C55161
+ *     responses:
+ *       200:
+ *         description: Order picked up successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Order picked up successfully
+ *                 orderStatus:
+ *                   type: string
+ *                   example: PICKED_UP
+ *       400:
+ *         description: Invalid order state
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Order is not ready for pickup
+ *       403:
+ *         description: Rider not assigned to this order
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: You are not assigned to this order
+ *       404:
+ *         description: Order not found
+ *       500:
+ *         description: Server error
+ */
+
+
+
+
+
+router.patch("/:orderId/pickup", pickupOrder);
+
+/*
+////////////////////////////////////////
+
+          deliver
+
+//////////////////////////////////////////// // 
+*/
+
+/**
+ * @swagger
+ * /api/orders/{orderId}/deliver:
+ *   patch:
+ *     tags:
+ *       - Orders
+ *     summary: Deliver order (credit rider earning & handle COD)
+ *     description: >
+ *       This API is used by the assigned rider to mark an order as delivered.
+ *       <br/><br/>
+ *       <b>Business Rules:</b>
+ *       <ul>
+ *         <li>Order must be in <b>PICKED_UP</b> state</li>
+ *         <li>Rider must be the assigned rider</li>
+ *         <li>Rider earning is always credited to rider wallet</li>
+ *         <li>If payment mode is <b>COD</b>, order amount is added to rider cash-in-hand</li>
+ *         <li>If payment mode is <b>ONLINE</b>, no cash flow is recorded</li>
+ *         <li>COD limit is enforced</li>
+ *       </ul>
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         example: ORD-80C55161
+ *     responses:
+ *       200:
+ *         description: Order delivered successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Order delivered successfully
+ *                 earningCredited:
+ *                   type: number
+ *                   example: 78
+ *                 codCollected:
+ *                   type: number
+ *                   example: 520
+ *       400:
+ *         description: Invalid order state or COD limit exceeded
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Order is not ready for delivery
+ *       403:
+ *         description: Rider not assigned to this order
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: You are not assigned to this order
+ *       404:
+ *         description: Order or Rider not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Order not found
+ *       500:
+ *         description: Server error
+ */
+router.patch("/:orderId/deliver",deliverOrder);
+
+
+
+/*
+==============================================
+=                                            = 
+             cancelOrder         
+=                                            =
+==============================================
+*/
+
+
+/**
+ * @swagger
+ * /api/orders/{orderId}/cancel:
+ *   patch:
+ *     tags:
+ *       - Orders
+ *     summary: Report issue / Cancel order
+ *     description: >
+ *       This API is used by the rider to report an issue and cancel the order
+ *       when the customer is not responding or any delivery issue occurs.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         example: ORD-DR-2864
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - reasonCode
+ *             properties:
+ *               reasonCode:
+ *                 type: string
+ *                 example: CUSTOMER_NOT_RESPONDING
+ *               reasonText:
+ *                 type: string
+ *                 example: Customer phone switched off for 2 minutes
+ *     responses:
+ *       200:
+ *         description: Order cancelled successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Order cancelled successfully
+ *                 cancelIssue:
+ *                   type: object
+ *                   properties:
+ *                     cancelledBy:
+ *                       type: string
+ *                       example: RIDER
+ *                     reasonCode:
+ *                       type: string
+ *                       example: CUSTOMER_NOT_RESPONDING
+ *                     reasonText:
+ *                       type: string
+ *                       example: Customer phone switched off for 2 minutes
+ *       400:
+ *         description: Invalid order state
+ *       403:
+ *         description: Rider not assigned
+ *       404:
+ *         description: Order not found
+ *       500:
+ *         description: Server error
+ */
+router.patch("/:orderId/cancel",cancelOrder);
+
+
+
+
+/**
+ * @swagger
+ * /api/orders/{riderId}/orders/stats:
+ *   get:
+ *     tags:
+ *       - Admin Rider Orders
+ *     summary: Get full order activity of a rider
+ *     description: >
+ *       Returns all orders where the rider was notified, accepted, rejected,
+ *       timed out, assigned, delivered or cancelled – with full order details.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: riderId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         example: 66b9f1e9a1b23c4d567890ab
+ *     responses:
+ *       200:
+ *         description: Full rider order activity fetched
+ */
+
+router.get("/:riderId/stats",getOrdersByRider);
+
+
+/**
+ * @swagger
+ * /api/orders/{riderId}/delivered:
+ *   get:
+ *     tags:
+ *       - Admin Rider Orders
+ *     summary: Get delivered orders of a rider
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: riderId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         example: 66b9f1e9a1b23c4d567890ab
+ *     responses:
+ *       200:
+ *         description: Delivered orders fetched successfully
+ */
+
+
+router.get("/:riderId/delivered",getDeliveredOrdersByRider);
+
+
+
+
+/**
+ * @swagger
+ * /api/orders/{riderId}/cancelled:
+ *   get:
+ *     tags:
+ *       - Admin Rider Orders
+ *     summary: Get cancelled orders of a rider
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: riderId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Cancelled orders fetched successfully
+ */
+
+router.get("/:riderId/cancelled",getCancelledOrdersByRider);
+
+
+
+
 
 module.exports = router;

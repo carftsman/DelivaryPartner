@@ -4,6 +4,7 @@ const {notifyRider} = require("../webSocket");
 const Rider=require('../models/RiderModel')
 const axios = require("axios");
 const PricingConfig=require("../models/pricingConfigSchema")
+const mongoose=require('mongoose')
 
 async function createOrder(req, res) {
   try {
@@ -48,36 +49,55 @@ async function createOrder(req, res) {
  
     // 🔹 Create Order (NO dynamic data)
     const order = await Order.create({
-      orderId,
-      vendorShopName,
-      items: formattedItems,
-      pickupAddress,
-      deliveryAddress,
- 
-      pricing: {
-        itemTotal,
-        deliveryFee: 0,
-        tax: 0,
-        platformCommission: 0,
-        totalAmount: itemTotal
-      },
- 
-      riderEarning: {
-        basePay: 0,
-        distancePay: 0,
-        surgePay: 0,
-        tips: 0,
-        totalEarning: 0,
-        credited: false
-      },
- 
-      payment: {
-        mode: payment.mode,
-        status: payment.mode === "COD" ? "PENDING" : "SUCCESS"
-      },
- 
-      orderStatus: "CREATED"
-    });
+  orderId,
+  vendorShopName,
+  items: formattedItems,
+
+  pickupAddress: {
+    name: pickupAddress.name,
+    addressLine: pickupAddress.addressLine,
+    contactNumber: pickupAddress.contactNumber,
+    location: {
+      type: "Point",
+      coordinates: [pickupAddress.lng, pickupAddress.lat]
+    }
+  },
+
+  deliveryAddress: {
+    name: deliveryAddress.name,
+    addressLine: deliveryAddress.addressLine,
+    contactNumber: deliveryAddress.contactNumber,
+    location: {
+      type: "Point",
+      coordinates: [deliveryAddress.lng, deliveryAddress.lat]
+    }
+  },
+
+  pricing: {
+    itemTotal,
+    deliveryFee: 0,
+    tax: 0,
+    platformCommission: 0,
+    totalAmount: itemTotal
+  },
+
+  riderEarning: {
+    basePay: 0,
+    distancePay: 0,
+    surgePay: 0,
+    tips: 0,
+    totalEarning: 0,
+    credited: false
+  },
+
+  payment: {
+    mode: payment.mode,
+    status: payment.mode === "COD" ? "PENDING" : "SUCCESS"
+  },
+
+  orderStatus: "CREATED"
+});
+
  
     return res.status(201).json({
       success: true,
@@ -177,33 +197,115 @@ async function createOrder(req, res) {
 
 ================================ */
 
+// async function getRouteInfo(pickupAddress, deliveryAddress) {
+//   // 🛡️ Safety checks
+//   if (!pickupAddress || !deliveryAddress) {
+//     throw new Error("Pickup or Delivery address missing");
+//   }
+
+//   const { lat: pickupLat, lng: pickupLng } = pickupAddress;
+//   const { lat: dropLat, lng: dropLng } = deliveryAddress;
+
+//   if (
+//     pickupLat == null ||
+//     pickupLng == null ||
+//     dropLat == null ||
+//     dropLng == null
+//   ) {
+//     throw new Error("Invalid pickup/delivery coordinates");
+//   }
+
+//   const url = "https://maps.googleapis.com/maps/api/directions/json";
+
+//   const response = await axios.get(url, {
+//     params: {
+//       origin: `${pickupLat},${pickupLng}`,
+//       destination: `${dropLat},${dropLng}`,
+//       key: process.env.GOOGLE_KEY,
+//     },
+//   });
+
+//   if (!response.data.routes || response.data.routes.length === 0) {
+//     throw new Error("No route found between pickup and drop");
+//   }
+
+//   const leg = response.data.routes[0].legs[0];
+
+//   return {
+//     distanceKm: Number((leg.distance.value / 1000).toFixed(2)),
+//     etaMinutes: Math.ceil(leg.duration.value / 60),
+//   };
+// }
+
+// async function getRouteInfo(pickupAddress, deliveryAddress) {
+//   console.log("Pickup:99", order.pickupAddress);
+// console.log("Delivery:99", order.deliveryAddress);
+
+//   const pickupCoords = pickupAddress?.location?.coordinates;
+//   const dropCoords = deliveryAddress?.location?.coordinates;
+
+//   if (
+//     !Array.isArray(pickupCoords) || pickupCoords.length !== 2 ||
+//     !Array.isArray(dropCoords) || dropCoords.length !== 2
+//   ) {
+//     throw new Error("Invalid pickup/delivery coordinates");
+//   }
+
+//   const [pickupLng, pickupLat] = pickupCoords;
+//   const [dropLng, dropLat] = dropCoords;
+
+//   const response = await axios.get(
+//     "https://maps.googleapis.com/maps/api/directions/json",
+//     {
+//       params: {
+//         origin: `${pickupLat},${pickupLng}`,
+//         destination: `${dropLat},${dropLng}`,
+//         key: process.env.GOOGLE_KEY
+//       }
+//     }
+//   );
+
+//   if (!response.data.routes?.length) {
+//     throw new Error("No route found");
+//   }
+
+//   const leg = response.data.routes[0].legs[0];
+
+//   return {
+//     distanceKm: +(leg.distance.value / 1000).toFixed(2),
+//     etaMinutes: Math.ceil(leg.duration.value / 60)
+//   };
+// }
+//2nd line is new
+
 async function getRouteInfo(pickupAddress, deliveryAddress) {
-  // 🛡️ Safety checks
   if (!pickupAddress || !deliveryAddress) {
     throw new Error("Pickup or Delivery address missing");
   }
 
-  const { lat: pickupLat, lng: pickupLng } = pickupAddress;
-  const { lat: dropLat, lng: dropLng } = deliveryAddress;
+  const pickupCoords = pickupAddress.location?.coordinates;
+  const dropCoords = deliveryAddress.location?.coordinates;
 
   if (
-    pickupLat == null ||
-    pickupLng == null ||
-    dropLat == null ||
-    dropLng == null
+    !Array.isArray(pickupCoords) || pickupCoords.length !== 2 ||
+    !Array.isArray(dropCoords) || dropCoords.length !== 2
   ) {
     throw new Error("Invalid pickup/delivery coordinates");
   }
 
-  const url = "https://maps.googleapis.com/maps/api/directions/json";
+  const [pickupLng, pickupLat] = pickupCoords;
+  const [dropLng, dropLat] = dropCoords;
 
-  const response = await axios.get(url, {
-    params: {
-      origin: `${pickupLat},${pickupLng}`,
-      destination: `${dropLat},${dropLng}`,
-      key: process.env.GOOGLE_KEY,
-    },
-  });
+  const response = await axios.get(
+    "https://maps.googleapis.com/maps/api/directions/json",
+    {
+      params: {
+        origin: `${pickupLat},${pickupLng}`,
+        destination: `${dropLat},${dropLng}`,
+        key: process.env.GOOGLE_KEY
+      }
+    }
+  );
 
   if (!response.data.routes || response.data.routes.length === 0) {
     throw new Error("No route found between pickup and drop");
@@ -213,255 +315,450 @@ async function getRouteInfo(pickupAddress, deliveryAddress) {
 
   return {
     distanceKm: Number((leg.distance.value / 1000).toFixed(2)),
-    etaMinutes: Math.ceil(leg.duration.value / 60),
+    etaMinutes: Math.ceil(leg.duration.value / 60)
   };
 }
- 
+
+
+
+
+
+
+
+
+
+
+
+
+
 /* ===============================
 
    CONFIRM ORDER API
 
 ================================ */
 
+// async function confirmOrder(req, res) {
+
+//   try {
+
+//     const { orderId } = req.params;
+ 
+//     // 1️⃣ Find order
+
+//     const order = await Order.findOne({ orderId });
+ 
+//     if (!order) {
+
+//       return res.status(404).json({
+
+//         success: false,
+
+//         message: "Order not found"
+
+//       });
+
+//     }
+ 
+//     if (order.orderStatus !== "CREATED") {
+
+//       return res.status(400).json({
+
+//         success: false,
+
+//         message: "Order already processed"
+
+//       });
+
+//     }
+ 
+//     // 2️⃣ Fetch eligible riders
+
+//     const riders = await Rider.find({
+
+//       "deliveryStatus.isActive": true,
+
+//       orderState: "READY",
+
+//       "riderStatus.isOnline": true
+
+//     })
+
+//       .limit(5)
+
+//       .select("_id");
+ 
+//     if (!riders.length) {
+
+//       return res.status(400).json({
+
+//         success: false,
+
+//         message: "No riders available"
+
+//       });
+
+//     }
+ 
+//     // 3️⃣ Update order allocation
+
+//     order.orderStatus = "CONFIRMED";
+
+//     order.allocation = {
+
+//       candidateRiders: riders.map(r => ({
+
+//         riderId: r._id,
+
+//         status: "PENDING",
+
+//         notifiedAt: new Date()
+
+//       })),
+
+//       expiresAt: new Date(Date.now() + 30 * 1000)
+
+//     };
+ 
+//     await order.save();
+ 
+//     /* =====================================
+
+//        DISTANCE + ETA + PRICING CALCULATION
+
+//     ====================================== */
+ 
+//     // 📍 Distantailsce & ETA
+// console.log(`order details${order}`); 
+//     const routeInfo = await getRouteInfo(
+
+//       order.pickupAddress,
+
+//       order.deliveryAddress
+
+//     );
+ 
+//     // 💰 Pricing config
+
+//     const pricingConfig = await PricingConfig.findOne({ isActive: true });
+
+//     if (!pricingConfig) {
+
+//       throw new Error("Pricing config not found");
+
+//     }
+ 
+//     const currentTime = new Date().toTimeString().slice(0, 5);
+
+//     const isRaining = order.weather === "RAIN";
+ 
+//     let estimatedEarning = 0;
+ 
+//     // Base fare (ALWAYS)
+
+//     estimatedEarning += pricingConfig.baseFare.baseAmount;
+ 
+//     // Distance fare
+
+//     if (routeInfo.distanceKm > pricingConfig.baseFare.baseDistanceKm) {
+
+//       const extraKm =
+
+//         routeInfo.distanceKm - pricingConfig.baseFare.baseDistanceKm;
+ 
+//       estimatedEarning +=
+
+//         extraKm * pricingConfig.distanceFare.perKmRate;
+
+//     }
+ 
+//     // Auto surges
+
+//     pricingConfig.surges.forEach(surge => {
+
+//       if (!surge.isActive) return;
+ 
+//       let apply = false;
+ 
+//       if (
+
+//         surge.type === "PEAK" &&
+
+//         currentTime >= surge.conditions.startTime &&
+
+//         currentTime <= surge.conditions.endTime
+
+//       ) apply = true;
+ 
+//       if (surge.type === "RAIN" && isRaining) apply = true;
+ 
+//       if (
+
+//         surge.type === "ZONE" &&
+
+//         surge.conditions.zoneIds?.includes(order.zoneId)
+
+//       ) apply = true;
+ 
+//       if (apply) {
+
+//         estimatedEarning += surge.value;
+
+//       }
+
+//     });
+ 
+//     // Save snapshot
+
+//     order.earningEstimate = {
+
+//       distanceKm: routeInfo.distanceKm,
+
+//       etaMinutes: routeInfo.etaMinutes,
+
+//       estimatedEarning
+
+//     };
+ 
+//     await order.save();
+ 
+//     /* ===============================
+
+//        WEBSOCKET NOTIFICATION
+
+//     ================================ */
+
+//     riders.forEach(rider => {
+
+//       notifyRider(rider._id.toString(), {
+
+//         type: "ORDER_POPUP",
+
+//         orderId: order.orderId,
+
+//         vendorShopName: order.vendorShopName,
+
+//         pickupLocation: order.pickupLocation,
+
+//         dropLocation: order.dropLocation,
+
+//         distanceKm: routeInfo.distanceKm,
+
+//         etaMinutes: routeInfo.etaMinutes,
+
+//         estimatedEarning
+
+//       });
+
+//     });
+ 
+//     return res.json({
+
+//       success: true,
+
+//       message: "Order confirmed and sent to riders",
+
+//       notifiedRiders: riders.length
+
+//     });
+ 
+//   } catch (err) {
+
+//     console.error("Confirm order error:", err);
+
+//     return res.status(500).json({
+
+//       success: false,
+
+//       message: "Failed to confirm order"
+
+//     });
+
+//   }
+
+// }
+
+
 async function confirmOrder(req, res) {
-
   try {
-
     const { orderId } = req.params;
- 
-    // 1️⃣ Find order
 
+    /* ===============================
+       1️⃣ FETCH ORDER
+    =============================== */
     const order = await Order.findOne({ orderId });
- 
+
     if (!order) {
-
       return res.status(404).json({
-
         success: false,
-
         message: "Order not found"
-
       });
-
     }
- 
+
     if (order.orderStatus !== "CREATED") {
-
       return res.status(400).json({
-
         success: false,
-
         message: "Order already processed"
-
       });
-
     }
- 
-    // 2️⃣ Fetch eligible riders
 
+    /* ===============================
+       2️⃣ FETCH ELIGIBLE RIDERS
+    =============================== */
     const riders = await Rider.find({
-
       "deliveryStatus.isActive": true,
-
       orderState: "READY",
-
       "riderStatus.isOnline": true
-
     })
-
       .limit(5)
-
       .select("_id");
- 
+
     if (!riders.length) {
-
       return res.status(400).json({
-
         success: false,
-
         message: "No riders available"
-
       });
-
     }
- 
-    // 3️⃣ Update order allocation
 
+    /* ===============================
+       3️⃣ UPDATE ORDER STATUS + ALLOCATION
+    =============================== */
     order.orderStatus = "CONFIRMED";
-
     order.allocation = {
-
       candidateRiders: riders.map(r => ({
-
         riderId: r._id,
-
         status: "PENDING",
-
         notifiedAt: new Date()
-
       })),
-
-      expiresAt: new Date(Date.now() + 30 * 1000)
-
+      expiresAt: new Date(Date.now() + 120 * 1000)
     };
- 
+
     await order.save();
- 
-    /* =====================================
 
-       DISTANCE + ETA + PRICING CALCULATION
-
-    ====================================== */
- 
-    // 📍 Distantailsce & ETA
-console.log(`order details${order}`); 
+    /* ===============================
+       4️⃣ DISTANCE + ETA
+    =============================== */
     const routeInfo = await getRouteInfo(
-
       order.pickupAddress,
-
       order.deliveryAddress
-
     );
- 
-    // 💰 Pricing config
 
+    /* ===============================
+       5️⃣ FETCH PRICING CONFIG
+    =============================== */
     const pricingConfig = await PricingConfig.findOne({ isActive: true });
-
     if (!pricingConfig) {
-
       throw new Error("Pricing config not found");
-
     }
- 
-    const currentTime = new Date().toTimeString().slice(0, 5);
 
-    const isRaining = order.weather === "RAIN";
- 
-    let estimatedEarning = 0;
- 
-    // Base fare (ALWAYS)
+    /* ===============================
+       6️⃣ RIDER EARNING CALCULATION
+    =============================== */
+    let basePay = pricingConfig.baseFare.baseAmount;
+    let distancePay = 0;
+    let surgePay = 0;
+    let appliedSurges = [];
 
-    estimatedEarning += pricingConfig.baseFare.baseAmount;
- 
-    // Distance fare
+    const distanceKm = routeInfo.distanceKm;
 
-    if (routeInfo.distanceKm > pricingConfig.baseFare.baseDistanceKm) {
-
+    // Distance pay
+    if (distanceKm > pricingConfig.baseFare.baseDistanceKm) {
       const extraKm =
+        distanceKm - pricingConfig.baseFare.baseDistanceKm;
 
-        routeInfo.distanceKm - pricingConfig.baseFare.baseDistanceKm;
- 
-      estimatedEarning +=
-
+      distancePay =
         extraKm * pricingConfig.distanceFare.perKmRate;
-
     }
- 
-    // Auto surges
+
+    // Surge logic
+    const currentTime = new Date().toTimeString().slice(0, 5);
+    const isRaining = order.weather === "RAIN";
 
     pricingConfig.surges.forEach(surge => {
-
       if (!surge.isActive) return;
- 
+
       let apply = false;
- 
-      if (
 
+      if (
         surge.type === "PEAK" &&
-
         currentTime >= surge.conditions.startTime &&
-
         currentTime <= surge.conditions.endTime
-
       ) apply = true;
- 
+
       if (surge.type === "RAIN" && isRaining) apply = true;
- 
+
       if (
-
         surge.type === "ZONE" &&
-
         surge.conditions.zoneIds?.includes(order.zoneId)
-
       ) apply = true;
- 
+
       if (apply) {
+        surgePay += surge.value;
 
-        estimatedEarning += surge.value;
-
+        appliedSurges.push({
+          type: surge.type,
+          multiplierType: surge.multiplierType || "FIXED",
+          value: surge.value
+        });
       }
-
     });
- 
-    // Save snapshot
 
-    order.earningEstimate = {
+    const totalEarning = basePay + distancePay + surgePay;
 
-      distanceKm: routeInfo.distanceKm,
-
-      etaMinutes: routeInfo.etaMinutes,
-
-      estimatedEarning
-
-    };
- 
-    await order.save();
- 
     /* ===============================
+       7️⃣ SAVE SNAPSHOT INTO ORDER
+    =============================== */
+    order.riderEarning = {
+      basePay,
+      distancePay,
+      surgePay,
+      appliedSurges,
+      tips: 0,
+      totalEarning,
+      credited: false
+    };
 
-       WEBSOCKET NOTIFICATION
+    order.tracking = {
+      distanceInKm: routeInfo.distanceKm,
+      durationInMin: routeInfo.etaMinutes
+    };
 
-    ================================ */
+    await order.save();
 
+    /* ===============================
+       8️⃣ WEBSOCKET NOTIFICATION
+    =============================== */
     riders.forEach(rider => {
-
       notifyRider(rider._id.toString(), {
-
         type: "ORDER_POPUP",
-
         orderId: order.orderId,
-
         vendorShopName: order.vendorShopName,
-
-        pickupLocation: order.pickupLocation,
-
-        dropLocation: order.dropLocation,
-
+        pickupLocation: order.pickupAddress,
+        dropLocation: order.deliveryAddress,
         distanceKm: routeInfo.distanceKm,
-
         etaMinutes: routeInfo.etaMinutes,
-
-        estimatedEarning
-
+        estimatedEarning: totalEarning
       });
-
     });
- 
-    return res.json({
 
+    /* ===============================
+       9️⃣ RESPONSE
+    =============================== */
+    return res.status(200).json({
       success: true,
-
       message: "Order confirmed and sent to riders",
-
+      estimatedEarning: totalEarning,
       notifiedRiders: riders.length
-
     });
- 
+
   } catch (err) {
-
     console.error("Confirm order error:", err);
-
     return res.status(500).json({
-
       success: false,
-
-      message: "Failed to confirm order"
-
+      message: err.message || "Failed to confirm order"
     });
-
   }
-
 }
+
 
  
 
@@ -596,6 +893,98 @@ async function acceptOrder(req, res) {
 
 }
 
+
+
+// async function acceptOrder(req, res) {
+//   try {
+//     const { orderId } = req.params;
+//     const { riderId } = req.body;
+
+//     const now = new Date();
+
+//     /* ===============================
+//        1️⃣ ASSIGN ORDER
+//     =============================== */
+//     const order = await Order.findOneAndUpdate(
+//       {
+//         orderId,
+//         orderStatus: "CONFIRMED",
+//         riderId: null,
+//         "allocation.expiresAt": { $gt: now },
+//         "allocation.candidateRiders": {
+//           $elemMatch: {
+//             riderId,
+//             status: "PENDING"
+//           }
+//         }
+//       },
+//       {
+//         $set: {
+//           riderId,
+//           orderStatus: "ASSIGNED",
+//           "allocation.assignedAt": now,
+//           "allocation.candidateRiders.$[r].status": "ACCEPTED"
+//         }
+//       },
+//       {
+//         new: true,
+//         arrayFilters: [{ "r.riderId": riderId }]
+//       }
+//     );
+
+//     if (!order) {
+//       return res.status(409).json({
+//         success: false,
+//         message: "Order already assigned or expired"
+//       });
+//     }
+
+//     /* ===============================
+//        2️⃣ REJECT OTHER RIDERS
+//     =============================== */
+//     await Order.updateOne(
+//       { orderId },
+//       {
+//         $set: {
+//           "allocation.candidateRiders.$[r].status": "REJECTED"
+//         }
+//       },
+//       {
+//         arrayFilters: [
+//           { "r.riderId": { $ne: riderId }, "r.status": "PENDING" }
+//         ]
+//       }
+//     );
+
+//     /* ===============================
+//        3️⃣ UPDATE RIDER STATE  🔥 MISSING PART
+//     =============================== */
+//     await Rider.findByIdAndUpdate(riderId, {
+//       $set: {
+//         orderState: "BUSY",
+//         currentOrderId: order._id
+//       }
+//     });
+
+//     /* ===============================
+//        4️⃣ RESPONSE
+//     =============================== */
+//     return res.json({
+//       success: true,
+//       message: "Order assigned successfully",
+//       orderId: order.orderId
+//     });
+
+//   } catch (err) {
+//     console.error("Accept order error:", err);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to accept order"
+//     });
+//   }
+// }
+
+
  
 
  
@@ -695,7 +1084,7 @@ async function getOrderDetails(req, res) {
     return res.status(200).json({
       success: true,
       message: "Order details fetched successfully",
-      filteredOrder
+      order
     });
 
   } catch (err) {
@@ -708,10 +1097,575 @@ async function getOrderDetails(req, res) {
 }
 
 
+async function pickupOrder(req, res) {
+  try {
+    const { orderId } = req.params;
+    const { riderId } = req.body;
+
+    /* ===============================
+       1️⃣ FETCH ORDER
+    =============================== */
+    const order = await Order.findOne({ orderId });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found"
+      });
+    }
+
+    /* ===============================
+       2️⃣ VALIDATE ORDER STATE
+    =============================== */
+    if (order.orderStatus !== "ASSIGNED") {
+      return res.status(400).json({
+        success: false,
+        message: "Order is not ready for pickup"
+      });
+    }
+
+    /* ===============================
+       3️⃣ VALIDATE RIDER
+    =============================== */
+    if (!order.riderId || order.riderId.toString() !== riderId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not assigned to this order"
+      });
+    }
+
+    /* ===============================
+       4️⃣ UPDATE ORDER STATUS
+    =============================== */
+    order.orderStatus = "PICKED_UP";
+
+    // Snapshot assigned rider info
+    order.assignedRider = {
+      riderId,
+      acceptedAt: order.assignedRider?.acceptedAt || new Date()
+    };
+
+    // Tracking update (optional but recommended)
+    order.tracking = {
+      ...order.tracking,
+      pickedUpAt: new Date()
+    };
+
+    await order.save();
+
+    /* ===============================
+       5️⃣ REAL-TIME NOTIFICATIONS
+    =============================== */
+
+    // Notify rider dashboard
+    notifyRider(riderId.toString(), {
+      type: "ORDER_PICKED_UP",
+      orderId: order.orderId
+    });
+
+    // Notify customer (if you have WS)
+
+    // notifyCustomer?.(order.customerId?.toString(), {
+    //   type: "ORDER_PICKED_UP",
+    //   orderId: order.orderId
+    // });
+
+    /* ===============================
+       6️⃣ RESPONSE
+    =============================== */
+    return res.status(200).json({
+      success: true,
+      message: "Order picked up successfully",
+      orderStatus: order.orderStatus
+    });
+
+  } catch (err) {
+    console.error("Pickup order error:", err);
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Failed to pickup order"
+    });
+  }
+}
+
+
+
+
+async function deliverOrder(req, res) {
+  try {
+    const { orderId } = req.params;
+    const { riderId } = req.body; // ✅ FIXED
+ 
+    if (!riderId) {
+      return res.status(400).json({
+        success: false,
+        message: "riderId is required"
+      });
+    }
+ 
+    /* ===============================
+       1️⃣ FETCH ORDER
+    =============================== */
+    const order = await Order.findOne({ orderId });
+ 
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found"
+      });
+    }
+ 
+    /* ===============================
+       2️⃣ VALIDATE ORDER STATUS
+    =============================== */
+    if (order.orderStatus !== "PICKED_UP") {
+      return res.status(400).json({
+        success: false,
+        message: `Order cannot be delivered. Current status: ${order.orderStatus}`
+      });
+    }
+ 
+    /* ===============================
+       3️⃣ VALIDATE RIDER ASSIGNMENT
+    =============================== */
+    if (!order.riderId) {
+      return res.status(400).json({
+        success: false,
+        message: "Order has no assigned rider"
+      });
+    }
+ 
+    const assignedRiderId =
+      order.riderId._id
+        ? order.riderId._id.toString()
+        : order.riderId.toString();
+ 
+    if (assignedRiderId !== riderId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not assigned to this order"
+      });
+    }
+ 
+    /* ===============================
+       4️⃣ FETCH RIDER
+    =============================== */
+    const rider = await Rider.findById(riderId);
+ 
+    if (!rider) {
+      return res.status(404).json({
+        success: false,
+        message: "Rider not found"
+      });
+    }
+ 
+    /* ===============================
+       5️⃣ CREDIT RIDER EARNING (ONCE)
+    =============================== */
+    if (!order.riderEarning.credited) {
+      const earning = Number(order.riderEarning.totalEarning || 0);
+ 
+      rider.wallet.balance += earning;
+      rider.wallet.totalEarned += earning;
+ 
+      order.riderEarning.credited = true;
+      order.riderEarning.creditedAt = new Date();
+      order.settlement.riderEarningAdded = true;
+    }
+ 
+    /* ===============================
+       6️⃣ HANDLE CASH ON DELIVERY
+    =============================== */
+    let codCollected = 0;
+ 
+    if (order.payment.mode === "COD") {
+      codCollected = Number(order.pricing.totalAmount || 0);
+ 
+      if (rider.cashInHand.balance + codCollected > rider.cashInHand.limit) {
+        rider.deliveryStatus.isActive = false;
+        rider.deliveryStatus.inactiveReason = "COD_LIMIT_EXCEEDED";
+ 
+        await rider.save();
+ 
+        return res.status(400).json({
+          success: false,
+          message: "COD limit exceeded. Please settle cash."
+        });
+      }
+ 
+      rider.cashInHand.balance += codCollected;
+      rider.cashInHand.lastUpdatedAt = new Date();
+    }
+ 
+    /* ===============================
+       7️⃣ UPDATE ORDER
+    =============================== */
+    order.orderStatus = "DELIVERED";
+    order.payment.status = "SUCCESS";
+    order.tracking.deliveredAt = new Date();
+ 
+    /* ===============================
+       8️⃣ UPDATE RIDER STATE
+    =============================== */
+    rider.orderState = "READY";
+    rider.currentOrderId = null;
+ 
+    /* ===============================
+       9️⃣ SAVE
+    =============================== */
+    await Promise.all([order.save(), rider.save()]);
+ 
+    /* ===============================
+       🔟 RESPONSE
+    =============================== */
+    return res.status(200).json({
+      success: true,
+      message: "Order delivered successfully",
+      orderId: order.orderId,
+      earningCredited: order.riderEarning.totalEarning,
+      codCollected
+    });
+ 
+  } catch (err) {
+    console.error("Deliver order error:", err);
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Failed to deliver order"
+    });
+  }
+}
+
+
+async function cancelOrder(req, res) {
+
+  try {
+
+    const { orderId } = req.params;
+
+    const { riderId, reasonCode, reasonText } = req.body; // ✅ FIXED
+ 
+    if (!riderId) {
+
+      return res.status(400).json({
+
+        success: false,
+
+        message: "riderId is required"
+
+      });
+
+    }
+ 
+    /* ===============================
+
+       1️⃣ FETCH ORDER
+
+    =============================== */
+
+    const order = await Order.findOne({ orderId });
+ 
+    if (!order) {
+
+      return res.status(404).json({
+
+        success: false,
+
+        message: "Order not found"
+
+      });
+
+    }
+ 
+    /* ===============================
+
+       2️⃣ VALIDATE STATE
+
+    =============================== */
+
+    if (["DELIVERED", "CANCELLED"].includes(order.orderStatus)) {
+
+      return res.status(400).json({
+
+        success: false,
+
+        message: "Order cannot be cancelled"
+
+      });
+
+    }
+ 
+    if (!order.riderId) {
+
+      return res.status(400).json({
+
+        success: false,
+
+        message: "Order has no assigned rider"
+
+      });
+
+    }
+ 
+    /* ===============================
+
+       3️⃣ VALIDATE RIDER ASSIGNMENT
+
+    =============================== */
+
+    const assignedRiderId =
+
+      order.riderId._id
+
+        ? order.riderId._id.toString()
+
+        : order.riderId.toString();
+ 
+    if (assignedRiderId !== riderId.toString()) {
+
+      return res.status(403).json({
+
+        success: false,
+
+        message: "You are not assigned to this order"
+
+      });
+
+    }
+ 
+    /* ===============================
+
+       4️⃣ UPDATE ORDER
+
+    =============================== */
+
+    order.orderStatus = "CANCELLED";
+
+    order.cancelIssue = {
+
+      cancelledBy: "RIDER",
+
+      reasonCode,
+
+      reasonText,
+
+      cancelledAt: new Date()
+
+    };
+ 
+    /* ===============================
+
+       5️⃣ RESET RIDER STATE
+
+    =============================== */
+
+    await Rider.findByIdAndUpdate(riderId, {
+
+      $set: {
+
+        orderState: "READY",
+
+        currentOrderId: null
+
+      }
+
+    });
+ 
+    await order.save();
+ 
+    /* ===============================
+
+       6️⃣ WS NOTIFICATION
+
+    =============================== */
+
+    notifyRider(riderId.toString(), {
+
+      type: "ORDER_CANCELLED",
+
+      orderId: order.orderId,
+
+      reason: reasonCode
+
+    });
+ 
+    /* ===============================
+
+       7️⃣ RESPONSE
+
+    =============================== */
+
+    return res.status(200).json({
+
+      success: true,
+
+      message: "Order cancelled successfully",
+
+      cancelIssue: order.cancelIssue
+
+    });
+ 
+  } catch (err) {
+
+    console.error("Cancel order error:", err);
+
+    return res.status(500).json({
+
+      success: false,
+
+      message: err.message || "Failed to cancel order"
+
+    });
+
+  }
+
+}
+
+
+/*
+=============================
+
+
+=============================
+*/
+
+async function getOrdersByRider(req, res) {
+  try {
+    const { riderId } = req.params;
+
+    const riderObjectId = new mongoose.Types.ObjectId(riderId);
+
+    const orders = await Order.aggregate([
+      {
+        $match: {
+          $or: [
+            { riderId: riderObjectId },
+            { "allocation.candidateRiders.riderId": riderObjectId }
+          ]
+        }
+      },
+
+      // Extract this rider's candidate object
+      {
+        $addFields: {
+          riderCandidate: {
+            $first: {
+              $filter: {
+                input: "$allocation.candidateRiders",
+                as: "cr",
+                cond: { $eq: ["$$cr.riderId", riderObjectId] }
+              }
+            }
+          }
+        }
+      },
+
+      // Decide rider relation with order
+      {
+        $addFields: {
+          riderRelation: {
+            $cond: [
+              { $eq: ["$riderId", riderObjectId] },
+              "ACCEPTED",
+              {
+                $cond: [
+                  { $eq: ["$riderCandidate.status", "REJECTED"] },
+                  "REJECTED",
+                  {
+                    $cond: [
+                      { $eq: ["$riderCandidate.status", "TIMEOUT"] },
+                      "TIMEOUT",
+                      "NOTIFIED"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+
+      // Sorting latest first
+      {
+        $sort: { createdAt: -1 }
+      }
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      riderId,
+      totalOrders: orders.length,
+      orders
+    });
+
+  } catch (err) {
+    console.error("Full rider order activity error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch rider order activity"
+    });
+  }
+}
+
+
+async function getDeliveredOrdersByRider(req, res) {
+  try {
+    const { riderId } = req.params;
+
+    const orders = await Order.find({
+      riderId,
+      orderStatus: "DELIVERED"
+    }).sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      riderId,
+      totalDeliveredOrders: orders.length,
+      orders
+    });
+
+  } catch (err) {
+    console.error("Delivered orders error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch delivered orders"
+    });
+  }
+}
+
+
+
+async function getCancelledOrdersByRider(req, res) {
+  try {
+    const { riderId } = req.params;
+
+    const orders = await Order.find({
+      riderId,
+      orderStatus: "CANCELLED"
+    }).sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      riderId,
+      totalCancelledOrders: orders.length,
+      orders
+    });
+
+  } catch (err) {
+    console.error("Cancelled orders error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch cancelled orders"
+    });
+  }
+}
+
+ 
+
+ 
 
  
  
  
-module.exports = { createOrder,confirmOrder,acceptOrder,rejectOrder,getOrderDetails };
+module.exports = { createOrder,confirmOrder,acceptOrder,rejectOrder,getOrderDetails,pickupOrder,deliverOrder, cancelOrder,getOrdersByRider,getDeliveredOrdersByRider,getCancelledOrdersByRider};
  
  
