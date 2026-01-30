@@ -1081,18 +1081,21 @@ exports.getSlotHistory = async (req, res) => {
     /* ----------------------------------------------------
        3. Generate all 7 dates of selected week
     -----------------------------------------------------*/
-    function getDateOfISOWeek(w, y) {
-      const simple = new Date(y, 0, 1 + (w - 1) * 7);
-      const dow = simple.getDay();
-      const ISOweekStart = simple;
-      if (dow <= 4)
-        ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
-      else
-        ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
-      return ISOweekStart;
-    }
+function getISOWeekStart(week, year) {
+  const jan4 = new Date(year, 0, 4); // Jan 4 is always in ISO week 1
+  const day = jan4.getDay() || 7;    // Sunday = 7
+  const monday = new Date(jan4);
+  monday.setDate(jan4.getDate() - (day - 1)); // Monday of week 1
+  monday.setHours(0, 0, 0, 0);
 
-    const weekStart = getDateOfISOWeek(weekNumber, year);
+  const targetWeekStart = new Date(monday);
+  targetWeekStart.setDate(monday.getDate() + (week - 1) * 7);
+
+  return targetWeekStart;
+}
+
+
+    const weekStart = getISOWeekStart(weekNumber, year);
 
     const weekDates = [];
     for (let i = 0; i < 7; i++) {
@@ -1119,6 +1122,11 @@ exports.getSlotHistory = async (req, res) => {
 
     bookings.forEach(b => {
       const dateKey = b.date;
+
+      if (!daysMap[dateKey]) {
+  // booking date is outside expected week range
+        return;
+      }
 
       daysMap[dateKey].slots.push(b);
       daysMap[dateKey].totalSlots++;

@@ -3,6 +3,7 @@ const riderEarningsRouter = express.Router();
 
 const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
 const { getEarningsSummary , getWeeklyChart ,getDailyEarnings , getDeliveryEarnings , getWeeklyEarnings ,getEarningsHistory} = require("../controllers/riderEarningsController");
+const { new_getDeliveryEarnings , new_getDailyEarnings , new_getWeeklyEarnings , new_getWeeklyChart ,new_getEarningsSummary} = require("../controllers/riderEarningsController");
 
 
 
@@ -73,6 +74,7 @@ const { getEarningsSummary , getWeeklyChart ,getDailyEarnings , getDeliveryEarni
 
 
 riderEarningsRouter.get("/new/summary", riderAuthMiddleWare, getEarningsSummary);
+riderEarningsRouter.get("/new/new_summary", riderAuthMiddleWare, new_getEarningsSummary);
 
 /**
  * @swagger
@@ -117,6 +119,7 @@ riderEarningsRouter.get("/new/summary", riderAuthMiddleWare, getEarningsSummary)
 
 
 riderEarningsRouter.get("/new/weekly-chart", riderAuthMiddleWare, getWeeklyChart);
+riderEarningsRouter.get("/new/new_weekly-chart", riderAuthMiddleWare, new_getWeeklyChart);
 
 
 /**
@@ -183,6 +186,7 @@ riderEarningsRouter.get("/new/weekly-chart", riderAuthMiddleWare, getWeeklyChart
 
 
 riderEarningsRouter.get("/new/daily", riderAuthMiddleWare, getDailyEarnings);
+riderEarningsRouter.get("/new/new_daily", riderAuthMiddleWare, new_getDailyEarnings);
 
 /**
  * @swagger
@@ -255,6 +259,7 @@ riderEarningsRouter.get("/new/daily", riderAuthMiddleWare, getDailyEarnings);
 
 
 riderEarningsRouter.get("/new/delivery/:orderId", riderAuthMiddleWare, getDeliveryEarnings);
+riderEarningsRouter.get("/new/new_delivery/:orderId", riderAuthMiddleWare, new_getDeliveryEarnings);
 
 
 /**
@@ -346,6 +351,7 @@ riderEarningsRouter.get("/new/delivery/:orderId", riderAuthMiddleWare, getDelive
 
 
 riderEarningsRouter.get("/new/weekly", riderAuthMiddleWare, getWeeklyEarnings);
+riderEarningsRouter.get("/new/new_weekly", riderAuthMiddleWare, new_getWeeklyEarnings);
 // riderEarningsRouter.get("/new/history", riderAuthMiddleWare, getEarningsHistory);
 
 
