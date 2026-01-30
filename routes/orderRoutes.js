@@ -16,6 +16,9 @@ const {
     getCancelledOrdersByRider
 } = require("../controllers/orderController");
 
+const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
+
+
 // ================================
 // CREATE ORDER
 // ================================
@@ -290,10 +293,12 @@ router.patch("/:orderId/confirm", confirmOrder);
  *       - Orders
  *     summary: Rider accepts an order
  *     description: >
- *       Allows a rider to accept a CONFIRMED order within the allocation window.
+ *       Allows an authenticated rider to accept a CONFIRMED order within the allocation window.
  *       The first rider to accept gets assigned.
  *       Once accepted, all other candidate riders are automatically rejected.
  *       This operation is atomic to avoid race conditions.
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: orderId
@@ -301,20 +306,7 @@ router.patch("/:orderId/confirm", confirmOrder);
  *         description: Unique order ID to accept
  *         schema:
  *           type: string
- *           example: ORD-F95B0DB0
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - riderId
- *             properties:
- *               riderId:
- *                 type: string
- *                 description: Rider ID who is accepting the order
- *                 example: 696b6787f212b183b5dffe5f
+ *         example: ORD-F95B0DB0
  *     responses:
  *       200:
  *         description: Order accepted and assigned successfully
@@ -328,7 +320,7 @@ router.patch("/:orderId/confirm", confirmOrder);
  *                   example: true
  *                 message:
  *                   type: string
- *                   example: Order assigned successfully
+ *                   example: "Order assigned successfully"
  *                 orderId:
  *                   type: string
  *                   example: ORD-F95B0DB0
@@ -344,14 +336,16 @@ router.patch("/:orderId/confirm", confirmOrder);
  *                   example: false
  *                 message:
  *                   type: string
- *                   example: Order already assigned or expired
+ *                   example: "Order already assigned or expired"
+ *       401:
+ *         description: Unauthorized (rider not authenticated)
  *       500:
  *         description: Internal server error
  */
 
 
 
-router.patch("/:orderId/accept", acceptOrder);
+router.patch("/:orderId/accept",riderAuthMiddleWare, acceptOrder);
 
 // ================================
 // RIDER REJECT ORDER
@@ -366,9 +360,11 @@ router.patch("/:orderId/accept", acceptOrder);
  *       - Orders
  *     summary: Rider rejects an order
  *     description: >
- *       Allows a rider to reject a CONFIRMED order during the allocation window.
+ *       Allows an authenticated rider to reject a CONFIRMED order during the allocation window.
  *       The rider must be one of the allocated candidate riders and must be in PENDING state.
  *       The rejection is handled atomically to prevent race conditions.
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: orderId
@@ -376,24 +372,18 @@ router.patch("/:orderId/accept", acceptOrder);
  *         description: Unique order ID to reject
  *         schema:
  *           type: string
- *           example: ORD-F95B0DB0
+ *         example: ORD-F95B0DB0
  *     requestBody:
- *       required: true
+ *       required: false
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - riderId
  *             properties:
- *               riderId:
- *                 type: string
- *                 description: Rider ID who is rejecting the order
- *                 example: 696b6787f212b183b5dffe5c
  *               reason:
  *                 type: string
  *                 description: Optional reason for rejection
- *                 example: Vehicle issue
+ *                 example: "Vehicle issue"
  *     responses:
  *       200:
  *         description: Order rejected successfully
@@ -407,7 +397,7 @@ router.patch("/:orderId/accept", acceptOrder);
  *                   example: true
  *                 message:
  *                   type: string
- *                   example: Order rejected successfully
+ *                   example: "Order rejected successfully"
  *                 pendingRiders:
  *                   type: number
  *                   description: Number of riders still in PENDING state
@@ -424,12 +414,14 @@ router.patch("/:orderId/accept", acceptOrder);
  *                   example: false
  *                 message:
  *                   type: string
- *                   example: Order already assigned or cannot be rejected
+ *                   example: "Order already assigned or cannot be rejected"
+ *       401:
+ *         description: Unauthorized (rider not authenticated)
  *       500:
  *         description: Internal server error
  */
 
- router.patch("/:orderId/reject", rejectOrder);
+ router.patch("/:orderId/reject",riderAuthMiddleWare, rejectOrder);
 
 // ================================
 // GET ORDER DETAILS
@@ -567,7 +559,7 @@ router.patch("/:orderId/accept", acceptOrder);
  *       500:
  *         description: Internal server error
  */
-router.get("/:orderId/details", getOrderDetails);
+router.get("/:orderId/details",riderAuthMiddleWare, getOrderDetails);
 
 
 
@@ -601,19 +593,6 @@ router.get("/:orderId/details", getOrderDetails);
  *         schema:
  *           type: string
  *         example: ORD-4DDF0D72
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - riderId
- *             properties:
- *               riderId:
- *                 type: string
- *                 description: Rider MongoDB ObjectId
- *                 example: 66b9f1e9a1b23c4d567890ab
  *     responses:
  *       200:
  *         description: Order picked up successfully
@@ -627,10 +606,10 @@ router.get("/:orderId/details", getOrderDetails);
  *                   example: true
  *                 message:
  *                   type: string
- *                   example: Order picked up successfully
+ *                   example: "Order picked up successfully"
  *                 orderStatus:
  *                   type: string
- *                   example: PICKED_UP
+ *                   example: "PICKED_UP"
  *       400:
  *         description: Invalid order state
  *         content:
@@ -643,7 +622,7 @@ router.get("/:orderId/details", getOrderDetails);
  *                   example: false
  *                 message:
  *                   type: string
- *                   example: Order is not ready for pickup
+ *                   example: "Order is not ready for pickup"
  *       403:
  *         description: Rider not assigned to this order
  *         content:
@@ -656,7 +635,7 @@ router.get("/:orderId/details", getOrderDetails);
  *                   example: false
  *                 message:
  *                   type: string
- *                   example: You are not assigned to this order
+ *                   example: "You are not assigned to this order"
  *       404:
  *         description: Order not found
  *         content:
@@ -669,13 +648,15 @@ router.get("/:orderId/details", getOrderDetails);
  *                   example: false
  *                 message:
  *                   type: string
- *                   example: Order not found
+ *                   example: "Order not found"
+ *       401:
+ *         description: Unauthorized (rider not authenticated)
  *       500:
  *         description: Server error
  */
 
 
-router.patch("/:orderId/pickup", pickupOrder);
+router.patch("/:orderId/pickup",riderAuthMiddleWare, pickupOrder);
 
 /*
 ////////////////////////////////////////
@@ -713,19 +694,6 @@ router.patch("/:orderId/pickup", pickupOrder);
  *         schema:
  *           type: string
  *         example: ORD-80C55161
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - riderId
- *             properties:
- *               riderId:
- *                 type: string
- *                 description: Rider MongoDB ObjectId
- *                 example: 66b9f1e9a1b23c4d567890ab
  *     responses:
  *       200:
  *         description: Order delivered successfully
@@ -739,7 +707,7 @@ router.patch("/:orderId/pickup", pickupOrder);
  *                   example: true
  *                 message:
  *                   type: string
- *                   example: Order delivered successfully
+ *                   example: "Order delivered successfully"
  *                 orderId:
  *                   type: string
  *                   example: ORD-80C55161
@@ -774,7 +742,7 @@ router.patch("/:orderId/pickup", pickupOrder);
  *                   example: false
  *                 message:
  *                   type: string
- *                   example: You are not assigned to this order
+ *                   example: "You are not assigned to this order"
  *       404:
  *         description: Order or rider not found
  *         content:
@@ -787,12 +755,14 @@ router.patch("/:orderId/pickup", pickupOrder);
  *                   example: false
  *                 message:
  *                   type: string
- *                   example: Order not found
+ *                   example: "Order not found"
+ *       401:
+ *         description: Unauthorized (rider not authenticated)
  *       500:
  *         description: Server error
  */
 
-router.patch("/:orderId/deliver",deliverOrder);
+router.patch("/:orderId/deliver",riderAuthMiddleWare,deliverOrder);
 
 
 
@@ -813,7 +783,7 @@ router.patch("/:orderId/deliver",deliverOrder);
  *       - Orders
  *     summary: Report issue / Cancel order
  *     description: >
- *       This API is used by the rider to report an issue and cancel the order
+ *       This API is used by the assigned rider to report an issue and cancel the order
  *       when the customer is not responding or any delivery issue occurs.
  *     security:
  *       - bearerAuth: []
@@ -831,13 +801,8 @@ router.patch("/:orderId/deliver",deliverOrder);
  *           schema:
  *             type: object
  *             required:
- *               - riderId
  *               - reasonCode
  *             properties:
- *               riderId:
- *                 type: string
- *                 description: Rider MongoDB ObjectId
- *                 example: "66b9f1e9a1b23c4d567890ab"
  *               reasonCode:
  *                 type: string
  *                 description: Cancellation reason code
@@ -878,90 +843,163 @@ router.patch("/:orderId/deliver",deliverOrder);
  *         description: Rider not assigned to this order
  *       404:
  *         description: Order not found
+ *       401:
+ *         description: Unauthorized (rider not authenticated)
  *       500:
  *         description: Server error
  */
 
-router.patch("/:orderId/cancel",cancelOrder);
+router.patch("/:orderId/cancel",riderAuthMiddleWare,cancelOrder);
 
 
 
 
 /**
  * @swagger
- * /api/orders/{riderId}/orders/stats:
+ * /api/orders/stats:
  *   get:
  *     tags:
  *       - Orders
- *     summary: Get full order activity of a rider
+ *     summary: Get full order activity of logged-in rider
  *     description: >
- *       Returns all orders where the rider was notified, accepted, rejected,
- *       timed out, assigned, delivered or cancelled – with full order details.
+ *       Returns all orders related to the authenticated rider, including:
+ *       <ul>
+ *         <li>Orders where the rider was notified</li>
+ *         <li>Accepted orders</li>
+ *         <li>Rejected orders</li>
+ *         <li>Timed out orders</li>
+ *         <li>Assigned orders</li>
+ *         <li>Delivered orders</li>
+ *         <li>Cancelled orders</li>
+ *       </ul>
+ *       Each order is returned with full order details.
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: riderId
- *         required: true
- *         schema:
- *           type: string
- *         example: 66b9f1e9a1b23c4d567890ab
  *     responses:
  *       200:
- *         description: Full rider order activity fetched
+ *         description: Full rider order activity fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 stats:
+ *                   type: object
+ *                   properties:
+ *                     totalNotified:
+ *                       type: number
+ *                       example: 12
+ *                     accepted:
+ *                       type: number
+ *                       example: 6
+ *                     rejected:
+ *                       type: number
+ *                       example: 3
+ *                     timedOut:
+ *                       type: number
+ *                       example: 2
+ *                     delivered:
+ *                       type: number
+ *                       example: 5
+ *                     cancelled:
+ *                       type: number
+ *                       example: 1
+ *                 orders:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     description: Full order document
+ *       401:
+ *         description: Unauthorized (rider not authenticated)
+ *       500:
+ *         description: Server error
  */
 
-router.get("/:riderId/stats",getOrdersByRider);
+router.get("/stats",riderAuthMiddleWare,getOrdersByRider);
 
 
 /**
  * @swagger
- * /api/orders/{riderId}/delivered:
+ * /api/orders/delivered:
  *   get:
  *     tags:
  *       - Orders
- *     summary: Get delivered orders of a rider
+ *     summary: Get delivered orders of logged-in rider
+ *     description: >
+ *       Returns all orders with status <b>DELIVERED</b> for the authenticated rider.
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: riderId
- *         required: true
- *         schema:
- *           type: string
- *         example: 66b9f1e9a1b23c4d567890ab
  *     responses:
  *       200:
  *         description: Delivered orders fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 count:
+ *                   type: number
+ *                   example: 5
+ *                 orders:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     description: Full order document
+ *       401:
+ *         description: Unauthorized (rider not authenticated)
+ *       500:
+ *         description: Server error
  */
 
 
-router.get("/:riderId/delivered",getDeliveredOrdersByRider);
+router.get("/:riderId/delivered",riderAuthMiddleWare,getDeliveredOrdersByRider);
 
 
 
 
 /**
  * @swagger
- * /api/orders/{riderId}/cancelled:
+ * /api/orders/cancelled:
  *   get:
  *     tags:
  *       - Orders
- *     summary: Get cancelled orders of a rider
+ *     summary: Get cancelled orders of logged-in rider
+ *     description: >
+ *       Returns all orders with status <b>CANCELLED</b> for the authenticated rider.
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: riderId
- *         required: true
- *         schema:
- *           type: string
  *     responses:
  *       200:
  *         description: Cancelled orders fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 count:
+ *                   type: number
+ *                   example: 2
+ *                 orders:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     description: Full order document
+ *       401:
+ *         description: Unauthorized (rider not authenticated)
+ *       500:
+ *         description: Server error
  */
 
-router.get("/:riderId/cancelled",getCancelledOrdersByRider);
+router.get("/cancelled",riderAuthMiddleWare,getCancelledOrdersByRider);
 
 
 

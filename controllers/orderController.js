@@ -771,7 +771,7 @@ async function acceptOrder(req, res) {
 
     const { orderId } = req.params;
 
-    const { riderId } = req.body;
+    const riderId  = req.rider._id;
  
     const now = new Date();
  
@@ -997,7 +997,8 @@ async function acceptOrder(req, res) {
 async function rejectOrder(req, res) {
   try {
     const { orderId } = req.params;
-    const { riderId, reason } = req.body;
+    const riderId = req.rider._id
+    const { reason } = req.body;
  
     const result = await Order.findOneAndUpdate(
       {
@@ -1100,7 +1101,7 @@ async function getOrderDetails(req, res) {
 async function pickupOrder(req, res) {
   try {
     const { orderId } = req.params;
-    const { riderId } = req.body;
+    const riderId  = req.rider._id;
 
     /* ===============================
        1️⃣ FETCH ORDER
@@ -1194,7 +1195,7 @@ async function pickupOrder(req, res) {
 async function deliverOrder(req, res) {
   try {
     const { orderId } = req.params;
-    const { riderId } = req.body; // ✅ FIXED
+    const riderId  = req.rider._id; // ✅ FIXED
  
     if (!riderId) {
       return res.status(400).json({
@@ -1341,8 +1342,8 @@ async function cancelOrder(req, res) {
   try {
 
     const { orderId } = req.params;
-
-    const { riderId, reasonCode, reasonText } = req.body; // ✅ FIXED
+    const riderId= req.rider._id;
+    const {  reasonCode, reasonText } = req.body; // ✅ FIXED
  
     if (!riderId) {
 
@@ -1530,7 +1531,7 @@ async function cancelOrder(req, res) {
 
 async function getOrdersByRider(req, res) {
   try {
-    const { riderId } = req.params;
+    const riderId  = req.rider._id;
 
     const riderObjectId = new mongoose.Types.ObjectId(riderId);
 
@@ -1609,7 +1610,7 @@ async function getOrdersByRider(req, res) {
 
 async function getDeliveredOrdersByRider(req, res) {
   try {
-    const { riderId } = req.params;
+    const  riderId  = req.rider._id;
 
     const orders = await Order.find({
       riderId,
@@ -1636,7 +1637,7 @@ async function getDeliveredOrdersByRider(req, res) {
 
 async function getCancelledOrdersByRider(req, res) {
   try {
-    const { riderId } = req.params;
+    const riderId = req.rider._id;
 
     const orders = await Order.find({
       riderId,
