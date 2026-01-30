@@ -3,6 +3,8 @@ const {getWeekNumber} = require("../helpers/getWeekNumber");
 
 const SlotBooking = require("../models/SlotBookingModel");
 const Rider = require("../models/RiderModel");
+    // FCM Notification
+const fcmService = require("../helpers/fcmService");
 
 
 // exports.getWeeklySlots = async (req, res) => {
@@ -720,15 +722,12 @@ exports.bookSlot = async (req, res) => {
       );
     }
 
-    // FCM Notification
-    const fcmService = require("../helpers/fcmService");
-     console.log("Rider FCM Token:", rider?.fcmToken);
     // 3. Send notification
     if (rider?.fcmToken) {
       await fcmService.sendToDevice({
         token: rider.fcmToken,
-        title: "Slot Booked ✅",
-        body: `Your slot  is booked`,
+        title: "Slot Booked",
+        body: `${createdBookings.length > 1 ? `${createdBookings.length} slots booked successfully` : "Slot booked successfully"}`,
         data: {
           type: "SLOT_BOOKED",
         },
@@ -827,6 +826,24 @@ exports.cancelSlot = async (req, res) => {
         $inc: { "slots.$.bookedRiders": -1 }
       }
     );
+    const rider = await Rider.findById(req.rider._id);
+    console.log("Rider FCM Token:", rider?.fcmToken);
+
+    if (rider?.fcmToken) {
+        await fcmService.sendToDevice({
+          token: rider.fcmToken,
+          title: "Slot Cancelled",
+          body: `Your slot ${booking.startTime}-${booking.endTime} on ${booking.date} was cancelled`,
+          data: {
+            type: "SLOT_CANCELLED",
+            bookingId: booking._id.toString(),
+            slotId: booking.slotId.toString(),
+            date: booking.date,
+            startTime: booking.startTime,
+            endTime: booking.endTime,
+          },
+        });
+      }
 
     return res.json({
       success: true,

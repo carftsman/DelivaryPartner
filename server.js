@@ -42,6 +42,8 @@
  
 const dotenv = require("dotenv");
 dotenv.config();
+const cron = require("node-cron");
+const { sendSlotStartReminder, sendSlotStartedNotification ,sendMissedSlotNotification } = require("./notifications/slotNotification");
  
 const http = require("http");
 const connectDB = require("./config/db");
@@ -58,6 +60,14 @@ const server = http.createServer(app);
 // Attach WebSocket to SAME server
 initWebSocket(server);  
 // initRiderSocket(server);
+
+
+
+
+cron.schedule("*/2 * * * *", sendSlotStartReminder); // every 2 mins
+cron.schedule("*/1 * * * *", sendSlotStartedNotification);  // every 1 min
+cron.schedule("*/2 * * * *", sendMissedSlotNotification);
+
  
 const PORT = process.env.PORT || 4000;
  

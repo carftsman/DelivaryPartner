@@ -394,6 +394,20 @@ const SlotBookingSchema = new mongoose.Schema(
       enum: ["APP", "ADMIN"],
       default: "APP"
     },
+    // Notification tracking
+    
+    reminderSent: {
+        type: Boolean,
+        default: false
+    },
+    startedNotificationSent: {
+        type: Boolean,
+        default: false
+    },
+    missedNotificationSent: {
+    type: Boolean,
+    default: false
+    },
 
     cancellationReason: {
       type: String,

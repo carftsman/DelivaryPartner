@@ -6,7 +6,8 @@ const sendToDevice = async ({ token, title, body, data = {} }) => {
     notification: { title, body },
     data,
   };
-
+//    console.log("FCM Message:", message);
+//    console.log("FCM Message 2 :", admin.messaging().send(message));
   return admin.messaging().send(message);
 };
 
