@@ -998,7 +998,7 @@ async function rejectOrder(req, res) {
   try {
     const { orderId } = req.params;
     const riderId = req.rider._id
-    const { reason } = req.body;
+   
  
     const result = await Order.findOneAndUpdate(
       {

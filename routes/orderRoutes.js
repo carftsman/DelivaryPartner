@@ -373,17 +373,6 @@ router.patch("/:orderId/accept",riderAuthMiddleWare, acceptOrder);
  *         schema:
  *           type: string
  *         example: ORD-F95B0DB0
- *     requestBody:
- *       required: false
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               reason:
- *                 type: string
- *                 description: Optional reason for rejection
- *                 example: "Vehicle issue"
  *     responses:
  *       200:
  *         description: Order rejected successfully
