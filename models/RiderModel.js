@@ -378,10 +378,54 @@ const RiderSchema = new Schema(
       backgroundLocation: { type: Boolean, default: false },
     },
  
-    riderStatus: {
-      isOnline: { type: Boolean, default: false },
-      lastOnlineAt: Date
-    },
+//     riderStatus: {
+
+//   isOnline: {
+//     type: Boolean,
+//     default: false,
+//     index: true
+//   },
+
+//   lastLoginAt: {
+//     type: Date
+//   },
+
+//   lastLogoutAt: {
+//     type: Date
+//   },
+
+//   totalOnlineMinutesToday: {
+//     type: Number,
+//     default: 0
+//   }
+
+// },
+riderStatus: {
+
+  isOnline: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+
+  lastLoginAt: {
+    type: Date,
+    default: null
+  },
+
+  lastLogoutAt: {
+    type: Date,
+    default: null
+  },
+
+  totalOnlineMinutesToday: {
+    type: Number,
+    default: 0
+  }
+
+},
+
+
  
     gps: {
       isEnabled: Boolean,
