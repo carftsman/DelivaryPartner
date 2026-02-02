@@ -605,12 +605,15 @@ async function confirmOrder(req, res) {
        2️⃣ FETCH ELIGIBLE RIDERS
     =============================== */
     const riders = await Rider.find({
-      "deliveryStatus.isActive": true,
+      // "deliveryStatus.isActive": true,
       orderState: "READY",
       "riderStatus.isOnline": true
     })
       .limit(10)
       .select("_id");
+
+    // const riders = await Rider.find({}).limit(10);
+
 
     if (!riders.length) {
       return res.status(400).json({
@@ -723,6 +726,12 @@ async function confirmOrder(req, res) {
     };
 
     await order.save();
+
+    console.log(
+  "Riders getting popup:",
+  riders.map(r => r._id.toString())
+);
+
 
     /* ===============================
        8️⃣ WEBSOCKET NOTIFICATION
