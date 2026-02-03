@@ -31,18 +31,17 @@ router.get("/slot-history", riderAuthMiddleWare, getSlotHistory);
  * @swagger
  * /api/rider/cashbalance:
  *   get:
+ *     summary: Get rider cash-in-hand summary and COD order details
+ *     description: |
+ *       Returns the rider's cash-in-hand balance, pending COD amount,
+ *       and COD order history. Used when rider collects cash via COD.
  *     tags:
- *       - Rider Cash
- *     summary: Get rider cash-in-hand summary
- *     description: >
- *       Fetches cash-in-hand details for the logged-in rider.
- *       Includes total cash collected, pending COD orders,
- *       cash order history, and deposit rules.
+ *       - Rider Wallet & Cash
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Cash-in-hand summary fetched successfully
+ *         description: Cash-in-hand details fetched successfully
  *         content:
  *           application/json:
  *             schema:
@@ -65,7 +64,7 @@ router.get("/slot-history", riderAuthMiddleWare, getSlotHistory);
  *                           example: INR
  *                         toDeposit:
  *                           type: number
- *                           example: 1200
+ *                           example: 700
  *                         depositRequired:
  *                           type: boolean
  *                           example: false
@@ -76,11 +75,11 @@ router.get("/slot-history", riderAuthMiddleWare, getSlotHistory);
  *                       type: object
  *                       properties:
  *                         pendingOrdersCount:
- *                           type: integer
- *                           example: 3
+ *                           type: number
+ *                           example: 2
  *                         pendingAmount:
  *                           type: number
- *                           example: 1200
+ *                           example: 700
  *                     cashOrderHistory:
  *                       type: array
  *                       items:
@@ -94,7 +93,7 @@ router.get("/slot-history", riderAuthMiddleWare, getSlotHistory);
  *                             example: Rahul Sharma
  *                           amount:
  *                             type: number
- *                             example: 400
+ *                             example: 350
  *                           status:
  *                             type: string
  *                             enum: [PENDING, DEPOSITED]
@@ -102,8 +101,7 @@ router.get("/slot-history", riderAuthMiddleWare, getSlotHistory);
  *                           collectedAt:
  *                             type: string
  *                             format: date-time
- *                             nullable: true
- *                             example: "2026-02-01T10:30:00Z"
+ *                             example: 2024-02-01T10:30:00Z
  *                           depositedAt:
  *                             type: string
  *                             format: date-time
@@ -113,7 +111,7 @@ router.get("/slot-history", riderAuthMiddleWare, getSlotHistory);
  *                       type: object
  *                       properties:
  *                         depositWithinHours:
- *                           type: integer
+ *                           type: number
  *                           example: 24
  *                         warningMessage:
  *                           type: string
@@ -158,6 +156,7 @@ router.get("/slot-history", riderAuthMiddleWare, getSlotHistory);
  *                   type: string
  *                   example: Failed to fetch cash summary
  */
+
 
 router.get("/cashbalance", riderAuthMiddleWare, getCashInHand);
 router.get("/wallet", riderAuthMiddleWare, getWallet);

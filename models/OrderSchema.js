@@ -466,6 +466,11 @@ deliveryAddress: {
       type: Number,
       default: 0
     },
+      pendingAmount: {
+    type: Number,
+    default: 0
+  },
+
 
     status: {
       type: String,

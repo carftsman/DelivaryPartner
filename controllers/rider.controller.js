@@ -282,7 +282,10 @@ exports.getCashInHand = async (req, res) => {
     const riderId = req.rider._id;
 
     // 1️⃣ Get rider cashInHand
-    const rider = await Rider.findById(riderId).select("cashInHand").lean();
+    const rider = await Rider.findById(riderId)
+      .select("cashInHand")
+      .lean();
+
     if (!rider) {
       return res.status(404).json({
         success: false,
@@ -293,13 +296,13 @@ exports.getCashInHand = async (req, res) => {
     const cashLimit = rider.cashInHand?.limit || 2500;
     const cashBalance = rider.cashInHand?.balance || 0;
 
-    // 2️⃣ Fetch COD orders (delivered or pending)
+    // 2️⃣ Fetch COD orders (FIXED)
     const orders = await Order.find({
       riderId,
       "payment.mode": "COD"
     })
       .select(
-        "orderId deliveryAddress.name cod.amount cod.status cod.collectedAt cod.depositedAt"
+        "orderId deliveryAddress.name pricing.totalAmount cod.amount cod.status cod.collectedAt cod.depositedAt"
       )
       .sort({ "cod.collectedAt": -1 })
       .lean();
@@ -307,8 +310,13 @@ exports.getCashInHand = async (req, res) => {
     let pendingOrdersCount = 0;
     let pendingAmount = 0;
 
-    const cashOrderHistory = orders.map((order) => {
-      const amount = order.cod?.amount ?? 0;
+    const cashOrderHistory = orders.map(order => {
+      // 🔥 FIX: fallback to pricing.totalAmount
+      const amount =
+        order.cod?.amount && order.cod.amount > 0
+          ? order.cod.amount
+          : order.pricing?.totalAmount || 0;
+
       const status = order.cod?.status ?? "PENDING";
 
       if (status === "PENDING") {
@@ -338,7 +346,7 @@ exports.getCashInHand = async (req, res) => {
           toDeposit: pendingAmount,
           depositRequired: pendingAmount > cashLimit
         },
-        lastDeposit: 0, // No CashDeposit model used
+        lastDeposit: 0,
         pendingOrdersSummary: {
           pendingOrdersCount,
           pendingAmount
@@ -353,7 +361,7 @@ exports.getCashInHand = async (req, res) => {
     });
   } catch (error) {
     console.error("CASH SUMMARY ERROR:", error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Failed to fetch cash summary"
     });
