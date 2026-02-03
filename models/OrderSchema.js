@@ -461,7 +461,28 @@ deliveryAddress: {
       },
       transactionId: String
     },
- 
+      cod: {
+    amount: {
+      type: Number,
+      default: 0
+    },
+
+    status: {
+      type: String,
+      enum: ["PENDING", "DEPOSITED"],
+      default: "PENDING",
+      index: true
+    },
+
+    collectedAt: {
+      type: Date
+    },
+
+    depositedAt: {
+      type: Date
+    }
+  },
+
     // Tracking summary
     tracking: {
       distanceInKm: Number,

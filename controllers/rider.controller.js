@@ -1,7 +1,7 @@
 const Order = require("../models/OrderSchema");
 const Rider = require("../models/RiderModel");
-const RiderDailyStats = require("../models/RiderDailyStatsSchema");
-const SlotHistory = require("../models/SlotModel");
+// const CashDeposit = require("../models/CashDeposit");
+// const WalletTransaction = require("../models/WalletTransaction");
 
 // ==============================
 // DELIVER ORDER (POST)
@@ -268,25 +268,159 @@ exports.getSlotHistory = async (req, res) => {
 // WALLET (GET)
 // ==============================
 
-exports.getWallet = async (req, res) => {
+
+
+exports.getCashInHand = async (req, res) => {
   try {
+    if (!req.rider || !req.rider._id) {
+      return res.status(400).json({
+        success: false,
+        message: "Rider info missing"
+      });
+    }
 
-    const rider = await Rider.findById(req.rider._id).select(
-      "cashInHand deliveryStatus"
-    );
+    const riderId = req.rider._id;
 
-    res.json({
-      success: true,
-      cashInHand: rider.cashInHand?.balance || 0,
-      limit: rider.cashInHand?.limit || 2500,
-      canTakeOrders: rider.deliveryStatus?.isActive !== false
+    // 1️⃣ Get rider cashInHand
+    const rider = await Rider.findById(riderId).select("cashInHand").lean();
+    if (!rider) {
+      return res.status(404).json({
+        success: false,
+        message: "Rider not found"
+      });
+    }
+
+    const cashLimit = rider.cashInHand?.limit || 2500;
+    const cashBalance = rider.cashInHand?.balance || 0;
+
+    // 2️⃣ Fetch COD orders (delivered or pending)
+    const orders = await Order.find({
+      riderId,
+      "payment.mode": "COD"
+    })
+      .select(
+        "orderId deliveryAddress.name cod.amount cod.status cod.collectedAt cod.depositedAt"
+      )
+      .sort({ "cod.collectedAt": -1 })
+      .lean();
+
+    let pendingOrdersCount = 0;
+    let pendingAmount = 0;
+
+    const cashOrderHistory = orders.map((order) => {
+      const amount = order.cod?.amount ?? 0;
+      const status = order.cod?.status ?? "PENDING";
+
+      if (status === "PENDING") {
+        pendingOrdersCount++;
+        pendingAmount += amount;
+      }
+
+      return {
+        orderId: order.orderId,
+        customerName: order.deliveryAddress?.name || "Customer",
+        amount,
+        status,
+        collectedAt: order.cod?.collectedAt || null,
+        depositedAt: order.cod?.depositedAt || null
+      };
     });
 
-  } catch (err) {
+    // 3️⃣ Use rider's cashInHand.balance as totalCashCollected
+    const totalCashCollected = cashBalance;
 
+    return res.status(200).json({
+      success: true,
+      data: {
+        cashSummary: {
+          totalCashCollected,
+          currency: "INR",
+          toDeposit: pendingAmount,
+          depositRequired: pendingAmount > cashLimit
+        },
+        lastDeposit: 0, // No CashDeposit model used
+        pendingOrdersSummary: {
+          pendingOrdersCount,
+          pendingAmount
+        },
+        cashOrderHistory,
+        rules: {
+          depositWithinHours: 24,
+          warningMessage:
+            "Cash must be deposited within 24 hours of collection. Failure to deposit may result in account suspension."
+        }
+      }
+    });
+  } catch (error) {
+    console.error("CASH SUMMARY ERROR:", error);
     res.status(500).json({
       success: false,
-      message: "Wallet fetch failed"
+      message: "Failed to fetch cash summary"
+    });
+  }
+};
+
+
+
+exports.getWallet = async (req, res) => {
+  try {
+    const riderId = req.rider._id;
+
+    // 1️⃣ Fetch rider info
+    const rider = await Rider.findById(riderId)
+      .select("wallet cashInHand bankDetails")
+      .lean();
+
+    if (!rider) {
+      return res.status(404).json({
+        success: false,
+        message: "Rider not found"
+      });
+    }
+
+    // 2️⃣ Calculate pending COD from delivered orders
+    const codOrders = await Order.find({
+      riderId,
+      "payment.mode": "COD",
+      orderStatus: "DELIVERED",
+      "cod.status": "PENDING"
+    }).select("cod.amount").lean();
+
+    const pendingCodAmount = codOrders.reduce(
+      (sum, o) => sum + (o.cod?.amount || 0),
+      0
+    );
+
+    // 3️⃣ Determine actions
+    const actions = {
+      canWithdraw: rider.wallet.balance >= 500, // Minimum withdrawal threshold
+      canAddMoney: true,
+      bankLinked: !!(
+        rider.bankDetails &&
+        rider.bankDetails.addedBankAccount &&
+        rider.bankDetails.verifiedAt
+      )
+    };
+
+    // 4️⃣ Build response
+    return res.status(200).json({
+      success: true,
+      data: {
+        walletSummary: {
+          availableBalance: rider.wallet.balance, // Only wallet balance
+          pendingCodAmount,                       // Pending COD
+          currency: "INR",
+          actions
+        },
+        recentTransactions: [] // No transaction history table
+      }
+    });
+
+  } catch (error) {
+    console.error("WALLET SUMMARY ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch wallet summary"
     });
   }
 };
