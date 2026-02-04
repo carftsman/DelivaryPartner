@@ -1080,7 +1080,8 @@ async function acceptOrder(req, res) {
 
       message: "Order accepted, rider is now busy",
 
-      orderId: order.orderId
+      orderId: order.orderId,
+      orderStatus:order.orderStatus
 
     });
  
@@ -1233,7 +1234,9 @@ async function getOrderDetails(req, res) {
     return res.status(200).json({
       success: true,
       message: "Order details fetched successfully",
+      orderStatus:order.orderStatus,
       order
+
     });
 
   } catch (err) {
@@ -1613,6 +1616,7 @@ async function deliverOrder(req, res) {
     return res.status(200).json({
       success: true,
       message: "Order delivered successfully",
+      orderStatus:order.orderStatus,
       orderId: order.orderId,
       earningCredited: order.riderEarning.totalEarning,
       codCollected
@@ -1910,6 +1914,8 @@ async function cancelOrder(req, res) {
     return res.status(200).json({
       success: true,
       message: "Order cancelled successfully",
+      orderStatus:order.orderStatus,
+
       cancelIssue: order.cancelIssue
     });
  
