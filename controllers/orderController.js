@@ -774,16 +774,170 @@ async function confirmOrder(req, res) {
 
 
 
+// async function acceptOrder(req, res) {
+
+//   try {
+
+//     const { orderId } = req.params;
+
+//     const riderId  = req.rider._id;
+ 
+//     const now = new Date();
+ 
+//     const order = await Order.findOneAndUpdate(
+
+//       {
+
+//         orderId,
+
+//         orderStatus: "CONFIRMED",
+
+//         riderId: null,
+
+//         "allocation.expiresAt": { $gt: now },
+
+//         "allocation.candidateRiders": {
+
+//           $elemMatch: {
+
+//             riderId,
+
+//             status: "PENDING"
+
+//           }
+
+//         }
+
+//       },
+
+//       {
+
+//         $set: {
+
+//           riderId,
+
+//           orderStatus: "ASSIGNED",
+
+//           "allocation.assignedAt": now,
+
+//           "allocation.candidateRiders.$[r].status": "ACCEPTED"
+
+//         }
+
+//       },
+
+//       {
+
+//         new: true,
+
+//         arrayFilters: [{ "r.riderId": riderId }]
+
+//       }
+
+//     );
+ 
+//     if (!order) {
+
+//       return res.status(409).json({
+
+//         success: false,
+
+//         message: "Order already assigned or expired"
+
+//       });
+
+//     }
+ 
+//     // Mark others as REJECTED
+
+//     await Order.updateOne(
+
+//       { orderId },
+
+//       {
+
+//         $set: {
+
+//           "allocation.candidateRiders.$[r].status": "REJECTED"
+
+//         }
+
+//       },
+
+//       {
+
+//         arrayFilters: [
+
+//           { "r.riderId": { $ne: riderId }, "r.status": "PENDING" }
+
+//         ]
+
+//       }
+
+//     );
+ 
+//     return res.json({
+
+//       success: true,
+
+//       message: "Order assigned successfully",
+
+//       orderId: order.orderId
+
+//     });
+ 
+//   } catch (err) {
+
+//     console.error("Accept order error:", err);
+
+//     return res.status(500).json({
+
+//       success: false,
+
+//       message: "Failed to accept order"
+
+//     });
+
+//   }
+
+// }
+
+
+ 
 async function acceptOrder(req, res) {
 
+  const session = await mongoose.startSession();
+ 
   try {
 
     const { orderId } = req.params;
 
-    const riderId  = req.rider._id;
- 
+    const riderId = req.rider._id;
+
     const now = new Date();
  
+    // 🚫 Rider already busy
+
+    if (req.rider.orderState === "BUSY") {
+
+      return res.status(409).json({
+
+        success: false,
+
+        message: "Rider already busy"
+
+      });
+
+    }
+ 
+    session.startTransaction();
+ 
+    /* ============================
+
+       1️⃣ ASSIGN ORDER
+
+    ============================ */
+
     const order = await Order.findOneAndUpdate(
 
       {
@@ -830,6 +984,8 @@ async function acceptOrder(req, res) {
 
         new: true,
 
+        session,
+
         arrayFilters: [{ "r.riderId": riderId }]
 
       }
@@ -837,6 +993,8 @@ async function acceptOrder(req, res) {
     );
  
     if (!order) {
+
+      await session.abortTransaction();
 
       return res.status(409).json({
 
@@ -848,7 +1006,11 @@ async function acceptOrder(req, res) {
 
     }
  
-    // Mark others as REJECTED
+    /* ============================
+
+       2️⃣ MARK OTHER RIDERS REJECTED
+
+    ============================ */
 
     await Order.updateOne(
 
@@ -866,6 +1028,8 @@ async function acceptOrder(req, res) {
 
       {
 
+        session,
+
         arrayFilters: [
 
           { "r.riderId": { $ne: riderId }, "r.status": "PENDING" }
@@ -876,11 +1040,45 @@ async function acceptOrder(req, res) {
 
     );
  
+    /* ============================
+
+       3️⃣ UPDATE RIDER → BUSY
+
+    ============================ */
+
+    await Rider.updateOne(
+
+      {
+
+        _id: riderId,
+
+        orderState: "READY" // 🔒 safety check
+
+      },
+
+      {
+
+        $set: {
+
+          orderState: "BUSY",
+
+          currentOrderId: order._id
+
+        }
+
+      },
+
+      { session }
+
+    );
+ 
+    await session.commitTransaction();
+ 
     return res.json({
 
       success: true,
 
-      message: "Order assigned successfully",
+      message: "Order accepted, rider is now busy",
 
       orderId: order.orderId
 
@@ -888,8 +1086,10 @@ async function acceptOrder(req, res) {
  
   } catch (err) {
 
-    console.error("Accept order error:", err);
+    await session.abortTransaction();
 
+    console.error("Accept order error:", err);
+ 
     return res.status(500).json({
 
       success: false,
@@ -898,100 +1098,39 @@ async function acceptOrder(req, res) {
 
     });
 
+  } finally {
+
+    session.endSession();
+
   }
 
 }
 
+ 
 
 
-// async function acceptOrder(req, res) {
-//   try {
-//     const { orderId } = req.params;
-//     const { riderId } = req.body;
 
-//     const now = new Date();
 
-//     /* ===============================
-//        1️⃣ ASSIGN ORDER
-//     =============================== */
-//     const order = await Order.findOneAndUpdate(
-//       {
-//         orderId,
-//         orderStatus: "CONFIRMED",
-//         riderId: null,
-//         "allocation.expiresAt": { $gt: now },
-//         "allocation.candidateRiders": {
-//           $elemMatch: {
-//             riderId,
-//             status: "PENDING"
-//           }
-//         }
-//       },
-//       {
-//         $set: {
-//           riderId,
-//           orderStatus: "ASSIGNED",
-//           "allocation.assignedAt": now,
-//           "allocation.candidateRiders.$[r].status": "ACCEPTED"
-//         }
-//       },
-//       {
-//         new: true,
-//         arrayFilters: [{ "r.riderId": riderId }]
-//       }
-//     );
 
-//     if (!order) {
-//       return res.status(409).json({
-//         success: false,
-//         message: "Order already assigned or expired"
-//       });
-//     }
 
-//     /* ===============================
-//        2️⃣ REJECT OTHER RIDERS
-//     =============================== */
-//     await Order.updateOne(
-//       { orderId },
-//       {
-//         $set: {
-//           "allocation.candidateRiders.$[r].status": "REJECTED"
-//         }
-//       },
-//       {
-//         arrayFilters: [
-//           { "r.riderId": { $ne: riderId }, "r.status": "PENDING" }
-//         ]
-//       }
-//     );
 
-//     /* ===============================
-//        3️⃣ UPDATE RIDER STATE  🔥 MISSING PART
-//     =============================== */
-//     await Rider.findByIdAndUpdate(riderId, {
-//       $set: {
-//         orderState: "BUSY",
-//         currentOrderId: order._id
-//       }
-//     });
 
-//     /* ===============================
-//        4️⃣ RESPONSE
-//     =============================== */
-//     return res.json({
-//       success: true,
-//       message: "Order assigned successfully",
-//       orderId: order.orderId
-//     });
 
-//   } catch (err) {
-//     console.error("Accept order error:", err);
-//     return res.status(500).json({
-//       success: false,
-//       message: "Failed to accept order"
-//     });
-//   }
-// }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
  
@@ -1025,7 +1164,7 @@ async function rejectOrder(req, res) {
         $set: {
           "allocation.candidateRiders.$[r].status": "REJECTED",
           "allocation.candidateRiders.$[r].rejectedAt": new Date(),
-          "allocation.candidateRiders.$[r].rejectReason": reason || null
+        
         }
       },
       {
@@ -1201,10 +1340,154 @@ async function pickupOrder(req, res) {
 
 
 
+// async function deliverOrder(req, res) {
+//   try {
+//     const { orderId } = req.params;
+//     const riderId  = req.rider._id; // ✅ FIXED
+ 
+//     if (!riderId) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "riderId is required"
+//       });
+//     }
+ 
+//     /* ===============================
+//        1️⃣ FETCH ORDER
+//     =============================== */
+//     const order = await Order.findOne({ orderId });
+ 
+//     if (!order) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Order not found"
+//       });
+//     }
+ 
+//     /* ===============================
+//        2️⃣ VALIDATE ORDER STATUS
+//     =============================== */
+//     if (order.orderStatus !== "PICKED_UP") {
+//       return res.status(400).json({
+//         success: false,
+//         message: `Order cannot be delivered. Current status: ${order.orderStatus}`
+//       });
+//     }
+ 
+//     /* ===============================
+//        3️⃣ VALIDATE RIDER ASSIGNMENT
+//     =============================== */
+//     if (!order.riderId) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Order has no assigned rider"
+//       });
+//     }
+ 
+//     const assignedRiderId =
+//       order.riderId._id
+//         ? order.riderId._id.toString()
+//         : order.riderId.toString();
+ 
+//     if (assignedRiderId !== riderId.toString()) {
+//       return res.status(403).json({
+//         success: false,
+//         message: "You are not assigned to this order"
+//       });
+//     }
+ 
+//     /* ===============================
+//        4️⃣ FETCH RIDER
+//     =============================== */
+//     const rider = await Rider.findById(riderId);
+ 
+//     if (!rider) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Rider not found"
+//       });
+//     }
+ 
+//     /* ===============================
+//        5️⃣ CREDIT RIDER EARNING (ONCE)
+//     =============================== */
+//     if (!order.riderEarning.credited) {
+//       const earning = Number(order.riderEarning.totalEarning || 0);
+ 
+//       rider.wallet.balance += earning;
+//       rider.wallet.totalEarned += earning;
+ 
+//       order.riderEarning.credited = true;
+//       order.riderEarning.creditedAt = new Date();
+//       order.settlement.riderEarningAdded = true;
+//     }
+ 
+//     /* ===============================
+//        6️⃣ HANDLE CASH ON DELIVERY
+//     =============================== */
+//     let codCollected = 0;
+ 
+//     if (order.payment.mode === "COD") {
+//       codCollected = Number(order.pricing.totalAmount || 0);
+ 
+//       if (rider.cashInHand.balance + codCollected > rider.cashInHand.limit) {
+//         rider.deliveryStatus.isActive = false;
+//         rider.deliveryStatus.inactiveReason = "COD_LIMIT_EXCEEDED";
+ 
+//         await rider.save();
+ 
+//         return res.status(400).json({
+//           success: false,
+//           message: "COD limit exceeded. Please settle cash."
+//         });
+//       }
+ 
+//       rider.cashInHand.balance += codCollected;
+//       rider.cashInHand.lastUpdatedAt = new Date();
+//     }
+ 
+//     /* ===============================
+//        7️⃣ UPDATE ORDER
+//     =============================== */
+//     order.orderStatus = "DELIVERED";
+//     order.payment.status = "SUCCESS";
+//     order.tracking.deliveredAt = new Date();
+ 
+//     /* ===============================
+//        8️⃣ UPDATE RIDER STATE
+//     =============================== */
+//     rider.orderState = "READY";
+//     rider.currentOrderId = null;
+ 
+//     /* ===============================
+//        9️⃣ SAVE
+//     =============================== */
+//     await Promise.all([order.save(), rider.save()]);
+ 
+//     /* ===============================
+//        🔟 RESPONSE
+//     =============================== */
+//     return res.status(200).json({
+//       success: true,
+//       message: "Order delivered successfully",
+//       orderId: order.orderId,
+//       earningCredited: order.riderEarning.totalEarning,
+//       codCollected
+//     });
+ 
+//   } catch (err) {
+//     console.error("Deliver order error:", err);
+//     return res.status(500).json({
+//       success: false,
+//       message: err.message || "Failed to deliver order"
+//     });
+//   }
+// }
+
 async function deliverOrder(req, res) {
   try {
     const { orderId } = req.params;
-    const riderId  = req.rider._id; // ✅ FIXED
+    const riderId = req.rider._id;
  
     if (!riderId) {
       return res.status(400).json({
@@ -1284,7 +1567,7 @@ async function deliverOrder(req, res) {
     }
  
     /* ===============================
-       6️⃣ HANDLE CASH ON DELIVERY
+       6️⃣ HANDLE COD
     =============================== */
     let codCollected = 0;
  
@@ -1294,7 +1577,6 @@ async function deliverOrder(req, res) {
       if (rider.cashInHand.balance + codCollected > rider.cashInHand.limit) {
         rider.deliveryStatus.isActive = false;
         rider.deliveryStatus.inactiveReason = "COD_LIMIT_EXCEEDED";
- 
         await rider.save();
  
         return res.status(400).json({
@@ -1315,7 +1597,7 @@ async function deliverOrder(req, res) {
     order.tracking.deliveredAt = new Date();
  
     /* ===============================
-       8️⃣ UPDATE RIDER STATE
+       8️⃣ RESET RIDER STATE → READY
     =============================== */
     rider.orderState = "READY";
     rider.currentOrderId = null;
@@ -1346,188 +1628,298 @@ async function deliverOrder(req, res) {
 }
 
 
+// async function cancelOrder(req, res) {
+
+//   try {
+
+//     const { orderId } = req.params;
+//     const riderId= req.rider._id;
+//     const {  reasonCode, reasonText } = req.body; // ✅ FIXED
+ 
+//     if (!riderId) {
+
+//       return res.status(400).json({
+
+//         success: false,
+
+//         message: "riderId is required"
+
+//       });
+
+//     }
+ 
+//     /* ===============================
+
+//        1️⃣ FETCH ORDER
+
+//     =============================== */
+
+//     const order = await Order.findOne({ orderId });
+ 
+//     if (!order) {
+
+//       return res.status(404).json({
+
+//         success: false,
+
+//         message: "Order not found"
+
+//       });
+
+//     }
+ 
+//     /* ===============================
+
+//        2️⃣ VALIDATE STATE
+
+//     =============================== */
+
+//     if (["DELIVERED", "CANCELLED"].includes(order.orderStatus)) {
+
+//       return res.status(400).json({
+
+//         success: false,
+
+//         message: "Order cannot be cancelled"
+
+//       });
+
+//     }
+ 
+//     if (!order.riderId) {
+
+//       return res.status(400).json({
+
+//         success: false,
+
+//         message: "Order has no assigned rider"
+
+//       });
+
+//     }
+ 
+//     /* ===============================
+
+//        3️⃣ VALIDATE RIDER ASSIGNMENT
+
+//     =============================== */
+
+//     const assignedRiderId =
+
+//       order.riderId._id
+
+//         ? order.riderId._id.toString()
+
+//         : order.riderId.toString();
+ 
+//     if (assignedRiderId !== riderId.toString()) {
+
+//       return res.status(403).json({
+
+//         success: false,
+
+//         message: "You are not assigned to this order"
+
+//       });
+
+//     }
+ 
+//     /* ===============================
+
+//        4️⃣ UPDATE ORDER
+
+//     =============================== */
+
+//     order.orderStatus = "CANCELLED";
+
+//     order.cancelIssue = {
+
+//       cancelledBy: "RIDER",
+
+//       reasonCode,
+
+//       reasonText,
+
+//       cancelledAt: new Date()
+
+//     };
+ 
+//     /* ===============================
+
+//        5️⃣ RESET RIDER STATE
+
+//     =============================== */
+
+//     await Rider.findByIdAndUpdate(riderId, {
+
+//       $set: {
+
+//         orderState: "READY",
+
+//         currentOrderId: null
+
+//       }
+
+//     });
+ 
+//     await order.save();
+ 
+//     /* ===============================
+
+//        6️⃣ WS NOTIFICATION
+
+//     =============================== */
+
+//     notifyRider(riderId.toString(), {
+
+//       type: "ORDER_CANCELLED",
+
+//       orderId: order.orderId,
+
+//       reason: reasonCode
+
+//     });
+ 
+//     /* ===============================
+
+//        7️⃣ RESPONSE
+
+//     =============================== */
+
+//     return res.status(200).json({
+
+//       success: true,
+
+//       message: "Order cancelled successfully",
+
+//       cancelIssue: order.cancelIssue
+
+//     });
+ 
+//   } catch (err) {
+
+//     console.error("Cancel order error:", err);
+
+//     return res.status(500).json({
+
+//       success: false,
+
+//       message: err.message || "Failed to cancel order"
+
+//     });
+
+//   }
+
+// }
+
 async function cancelOrder(req, res) {
-
   try {
-
     const { orderId } = req.params;
-    const riderId= req.rider._id;
-    const {  reasonCode, reasonText } = req.body; // ✅ FIXED
+    const riderId = req.rider._id;
+    const { reasonCode, reasonText } = req.body;
  
     if (!riderId) {
-
       return res.status(400).json({
-
         success: false,
-
         message: "riderId is required"
-
       });
-
     }
  
     /* ===============================
-
        1️⃣ FETCH ORDER
-
     =============================== */
-
     const order = await Order.findOne({ orderId });
  
     if (!order) {
-
       return res.status(404).json({
-
         success: false,
-
         message: "Order not found"
-
       });
-
     }
  
     /* ===============================
-
        2️⃣ VALIDATE STATE
-
     =============================== */
-
     if (["DELIVERED", "CANCELLED"].includes(order.orderStatus)) {
-
       return res.status(400).json({
-
         success: false,
-
         message: "Order cannot be cancelled"
-
       });
-
     }
  
     if (!order.riderId) {
-
       return res.status(400).json({
-
         success: false,
-
         message: "Order has no assigned rider"
-
       });
-
     }
  
     /* ===============================
-
        3️⃣ VALIDATE RIDER ASSIGNMENT
-
     =============================== */
-
     const assignedRiderId =
-
       order.riderId._id
-
         ? order.riderId._id.toString()
-
         : order.riderId.toString();
  
     if (assignedRiderId !== riderId.toString()) {
-
       return res.status(403).json({
-
         success: false,
-
         message: "You are not assigned to this order"
-
       });
-
     }
  
     /* ===============================
-
        4️⃣ UPDATE ORDER
-
     =============================== */
-
     order.orderStatus = "CANCELLED";
-
     order.cancelIssue = {
-
       cancelledBy: "RIDER",
-
       reasonCode,
-
       reasonText,
-
       cancelledAt: new Date()
-
     };
  
     /* ===============================
-
-       5️⃣ RESET RIDER STATE
-
+       5️⃣ RESET RIDER STATE → READY
     =============================== */
-
-    await Rider.findByIdAndUpdate(riderId, {
-
-      $set: {
-
-        orderState: "READY",
-
-        currentOrderId: null
-
+    await Rider.findOneAndUpdate(
+      { _id: riderId, currentOrderId: order._id },
+      {
+        $set: {
+          orderState: "READY",
+          currentOrderId: null
+        }
       }
-
-    });
+    );
  
     await order.save();
  
     /* ===============================
-
        6️⃣ WS NOTIFICATION
-
     =============================== */
-
     notifyRider(riderId.toString(), {
-
       type: "ORDER_CANCELLED",
-
       orderId: order.orderId,
-
       reason: reasonCode
-
     });
  
     /* ===============================
-
        7️⃣ RESPONSE
-
     =============================== */
-
     return res.status(200).json({
-
       success: true,
-
       message: "Order cancelled successfully",
-
       cancelIssue: order.cancelIssue
-
     });
  
   } catch (err) {
-
     console.error("Cancel order error:", err);
-
     return res.status(500).json({
-
       success: false,
-
       message: err.message || "Failed to cancel order"
-
     });
-
   }
-
 }
 
 
