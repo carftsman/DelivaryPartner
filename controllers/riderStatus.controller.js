@@ -85,12 +85,12 @@ exports.goOnline = async (req, res) => {
     }
 
     // Already online check
-    if (riderData.riderStatus.isOnline) {
-      return res.status(400).json({
-        success: false,
-        message: "Rider already online"
-      });
-    }
+    // if (riderData.riderStatus.isOnline) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "Rider already online"
+    //   });
+    // }
 
     // ❌ Block if account is suspended / KYC pending
     if (
@@ -240,12 +240,12 @@ exports.goOffline = async (req, res) => {
 
     const riderData = await Rider.findById(riderId);
 
-    if (!riderData || !riderData.riderStatus.isOnline) {
-      return res.status(400).json({
-        success: false,
-        message: "Rider already offline"
-      });
-    }
+    // if (!riderData || !riderData.riderStatus.isOnline) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "Rider already offline"
+    //   });
+    // }
 
     const logoutTime = new Date();
     const loginTime = riderData.riderStatus.lastLoginAt;
