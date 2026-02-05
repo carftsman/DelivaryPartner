@@ -690,35 +690,76 @@ exports.bookSlot = async (req, res) => {
       const slotKey = `${dayOfWeek}_${slot.startTime.replace(":", "")}_${slot.endTime.replace(":", "")}`;
       const durationMinutes = (slot.durationInHours || 0) * 60;
 
-      const booking = await SlotBooking.create({
-        riderId,
-        daySlotId: daySlot._id,
-        slotId,
-        slotKey,
-        date,
-        dayOfWeek,
-        dayNumber,
-        weekNumber: daySlot.weekNumber,
-        year: daySlot.year,
-        city: daySlot.city,
-        zone: daySlot.zone,
-        startTime: slot.startTime,
-        endTime: slot.endTime,
-        slotStartAt: new Date(`${date}T${slot.startTime}:00`),
-        slotEndAt: new Date(`${date}T${slot.endTime}:00`),
-        totalMinutes: durationMinutes,
-        isPeakSlot: slot.isPeakSlot,
-        incentiveText: slot.incentiveText,
-        status: "BOOKED",
-        bookedFrom: "APP"
-      });
+      // const booking = await SlotBooking.create({
+      //   riderId,
+      //   daySlotId: daySlot._id,
+      //   slotId,
+      //   slotKey,
+      //   date,
+      //   dayOfWeek,
+      //   dayNumber,
+      //   weekNumber: daySlot.weekNumber,
+      //   year: daySlot.year,
+      //   city: daySlot.city,
+      //   zone: daySlot.zone,
+      //   startTime: slot.startTime,
+      //   endTime: slot.endTime,
+      //   slotStartAt: new Date(`${date}T${slot.startTime}:00`),
+      //   slotEndAt: new Date(`${date}T${slot.endTime}:00`),
+      //   totalMinutes: durationMinutes,
+      //   isPeakSlot: slot.isPeakSlot,
+      //   incentiveText: slot.incentiveText,
+      //   status: "BOOKED",
+      //   bookedFrom: "APP"
+      // });
+
+      const booking = await SlotBooking.findOneAndUpdate(
+      { riderId, date, slotId },          // SAME UNIQUE KEY
+      {
+        $set: {
+          daySlotId: daySlot._id,
+          slotKey,
+          dayOfWeek,
+          dayNumber,
+          weekNumber: daySlot.weekNumber,
+          year: daySlot.year,
+          city: daySlot.city,
+          zone: daySlot.zone,
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          slotStartAt: new Date(`${date}T${slot.startTime}:00`),
+          slotEndAt: new Date(`${date}T${slot.endTime}:00`),
+          totalMinutes: durationMinutes,
+          isPeakSlot: slot.isPeakSlot,
+          incentiveText: slot.incentiveText,
+          status: "BOOKED",
+          bookedFrom: "APP",
+          cancellationReason: null,
+          bookedAt: new Date()
+        }
+      },
+      {
+        upsert: true,   //CREATE if first time, UPDATE if cancelled earlier
+        new: true
+      }
+    );
+
+
 
       createdBookings.push(booking);
 
       // Increase booked count in DB
       await Slot.updateOne(
         { _id: daySlot._id, "slots.slotId": slotId },
-        { $inc: { "slots.$.bookedRiders": 1 } }
+        { $inc: { "slots.$.bookedRiders": 1 },
+          $push: {
+            "slots.$.riders": {
+              riderId,
+              status: "BOOKED",
+              bookedAt: new Date()
+            }
+          }
+        }
       );
     }
 
@@ -811,21 +852,66 @@ exports.cancelSlot = async (req, res) => {
       });
     }
 
+    if (booking.status !== "BOOKED") {
+      return res.status(400).json({
+        success: false,
+        message: "Slot already cancelled or completed"
+      });
+   }
+
     // 6️⃣ Update booking status
     booking.status = "CANCELLED_BY_RIDER";
     booking.cancellationReason = "Rider cancelled";
     await booking.save();
 
     // 7️⃣ Decrease nested bookedRiders count
+    //   await Slot.updateOne(
+    //   {
+    //     _id: booking.daySlotId,
+    //     "slots.slotId": booking.slotId,
+    //     "slots.riders.riderId": riderId
+    //   },
+    //   {
+    //     $inc: {
+    //       "slots.$.bookedRiders": -1
+    //     },
+    //     $set: {
+    //       "slots.$.riders.$[r].status": "CANCELLED",
+    //       "slots.$.riders.$[r].cancelledAt": new Date()
+    //     }
+    //   },
+    //   {
+    //     arrayFilters: [
+    //       { "r.riderId": riderId }
+    //     ]
+    //   }
+    // );
+
     await Slot.updateOne(
       {
         _id: booking.daySlotId,
-        "slots.slotId": booking.slotId
+        "slots.slotId": booking.slotId,
+        "slots.riders": {
+          $elemMatch: {
+            riderId,
+            status: "BOOKED"
+          }
+        }
       },
       {
-        $inc: { "slots.$.bookedRiders": -1 }
+        $inc: { "slots.$.bookedRiders": -1 },
+        $set: {
+          "slots.$.riders.$[r].status": "CANCELLED",
+          "slots.$.riders.$[r].cancelledAt": new Date()
+        }
+      },
+      {
+        arrayFilters: [{ "r.riderId": riderId }]
       }
     );
+
+
+
     const rider = await Rider.findById(req.rider._id);
     console.log("Rider FCM Token:", rider?.fcmToken);
 

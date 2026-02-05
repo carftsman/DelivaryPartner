@@ -79,6 +79,6 @@ adminRouter.get("/get-offline-stores", getOfflineStores);
  */
 adminRouter.post("/offline-stores", createOfflineStore);
 
-adminRouter.post("/slots", createWeeklySlots);
+adminRouter.post("/create-weekly", createWeeklySlots);
 
 module.exports = adminRouter;

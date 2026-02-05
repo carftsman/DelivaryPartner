@@ -242,6 +242,31 @@ const SlotSchema = new mongoose.Schema(
           min: 0
         },
 
+        riders: [
+          {
+            riderId: {
+              type: mongoose.Schema.Types.ObjectId,
+              ref: "Rider",
+              
+            },
+
+            status: {
+              type: String,
+              enum: ["BOOKED", "CANCELLED", "NO_SHOW", "COMPLETED"],
+            },
+
+            bookedAt: {
+              type: Date,
+              default: Date.now
+            },
+
+            cancelledAt: Date,
+            noShowAt: Date
+          }
+        ],
+
+
+
         /* ------------ ADMIN & SYSTEM FLAGS ------------ */
         isAvailable: {
           type: Boolean,
