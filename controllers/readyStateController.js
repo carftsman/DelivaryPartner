@@ -5,7 +5,7 @@ const Rider = require("../models/RiderModel");
 
 exports.markOrderStateReady = async (req, res) => {
   try {
-    const riderId = req.user._id;
+    const riderId = req.rider._id;
 
     const updatedRider = await Rider.findOneAndUpdate(
       {

@@ -7,8 +7,8 @@ const {riderAuthMiddleWare} = require("../middleware/riderAuthMiddleware");
 
 /**
  * @swagger
- * /rider/order-state/ready:
- *   post:
+ * /api/order-state/ready:
+ *   patch:
  *     tags:
  *       - Busy State
  *     summary: Set rider order state to READY
@@ -52,7 +52,7 @@ const {riderAuthMiddleWare} = require("../middleware/riderAuthMiddleware");
  */
 
 
-router.post(
+router.patch(
   "/order-state/ready",
   riderAuthMiddleWare,
   markOrderStateReady
