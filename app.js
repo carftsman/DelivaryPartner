@@ -35,6 +35,7 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const fcmTokenRoutes = require("./routes/fcmTokenRoutes");
 const riderStatusRoutes = require("./routes/riderStatus.routes");
 const riderCashRoutes = require("./routes/riderCashRoutes");
+const orderStateReady=require('./routes/readyStateRouter')
 
 
 // const offlineStoreRoute = require("./routes/offlineStoreRoute");
@@ -76,6 +77,7 @@ app.use("/api", riderRouter);
 app.use("/api/location", locationRouter);
 app.use("/aadhar", aadharRoute);
 app.use("/api/bank", bankDetailsRoutes);
+
 
 app.use("/api/mobile",staticRouter);
 
@@ -130,7 +132,8 @@ app.use("/api/rider", require("./routes/rider.routes"));
 app.use("/api/rider/status", riderStatusRoutes);
 app.use("/api", riderCashRoutes);
 
-
+//orderState Ready
+app.use('/api',orderStateReady)
 
 
 
