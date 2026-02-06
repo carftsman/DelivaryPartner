@@ -22,7 +22,6 @@ const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
 // ================================
 // CREATE ORDER
 // ================================
-
 /**
  * @swagger
  * /api/orders/orderCreate:
@@ -64,6 +63,7 @@ const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
  *                     - itemName
  *                     - quantity
  *                     - price
+ *                     - total        # ✅ ADDED AS REQUIRED
  *                   properties:
  *                     itemName:
  *                       type: string
@@ -74,25 +74,20 @@ const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
  *                     price:
  *                       type: number
  *                       example: 60
+ *                     total:         # ✅ ADDED FIELD
+ *                       type: number
+ *                       example: 120
  *
  *               pickupAddress:
  *                 type: object
  *                 required:
  *                   - name
- *                   - lat
- *                   - lng
  *                   - addressLine
  *                   - contactNumber
  *                 properties:
  *                   name:
  *                     type: string
  *                     example: Fresh Mart Store
- *                   lat:
- *                     type: number
- *                     example: 17.4200
- *                   lng:
- *                     type: number
- *                     example: 78.3900
  *                   addressLine:
  *                     type: string
  *                     example: Madhapur, Hyderabad
@@ -104,20 +99,12 @@ const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
  *                 type: object
  *                 required:
  *                   - name
- *                   - lat
- *                   - lng
  *                   - addressLine
  *                   - contactNumber
  *                 properties:
  *                   name:
  *                     type: string
  *                     example: Rohit Kumar
- *                   lat:
- *                     type: number
- *                     example: 17.4600
- *                   lng:
- *                     type: number
- *                     example: 78.4100
  *                   addressLine:
  *                     type: string
  *                     example: Kukatpally, Hyderabad
@@ -181,6 +168,7 @@ const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
  *                   type: string
  *                   example: Order creation failed
  */
+
 router.post("/orderCreate", createOrder);
 
 // ================================
