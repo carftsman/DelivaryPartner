@@ -5,114 +5,127 @@ const Rider=require('../models/RiderModel')
 const axios = require("axios");
 const PricingConfig=require("../models/pricingConfigSchema")
 const mongoose=require('mongoose')
+const { getLatLng } = require("../services/geocodeService");
 
-async function createOrder(req, res) {
-  try {
-    const {
-      vendorShopName,
-      items,
-      pickupAddress,
-      deliveryAddress,
-      payment
-    } = req.body;
- 
-    if (!vendorShopName) {
-      return res.status(400).json({
-        success: false,
-        message: "vendorShopName is required"
-      });
-    }
- 
-    if (!items || !items.length) {
-      return res.status(400).json({
-        success: false,
-        message: "Items are required"
-      });
-    }
- 
-    // 🔹 Calculate item totals ONLY
-    let itemTotal = 0;
-    const formattedItems = items.map(item => {
-      const total = item.quantity * item.price;
-      itemTotal += total;
-      return {
-        itemName: item.itemName,
-        quantity: item.quantity,
-        price: item.price,
-        total
-      };
-    });
- 
-    // 🔹 Generate Order ID
-    const orderId =
-      "ORD-" + crypto.randomBytes(4).toString("hex").toUpperCase();
- 
-    // 🔹 Create Order (NO dynamic data)
-    const order = await Order.create({
-  orderId,
-  vendorShopName,
-  items: formattedItems,
 
-  pickupAddress: {
-    name: pickupAddress.name,
-    addressLine: pickupAddress.addressLine,
-    contactNumber: pickupAddress.contactNumber,
-    location: {
-      type: "Point",
-      coordinates: [pickupAddress.lng, pickupAddress.lat]
-    }
-  },
 
-  deliveryAddress: {
-    name: deliveryAddress.name,
-    addressLine: deliveryAddress.addressLine,
-    contactNumber: deliveryAddress.contactNumber,
-    location: {
-      type: "Point",
-      coordinates: [deliveryAddress.lng, deliveryAddress.lat]
-    }
-  },
-
-  pricing: {
-    itemTotal,
-    deliveryFee: 0,
-    tax: 0,
-    platformCommission: 0,
-    totalAmount: itemTotal
-  },
-
-  riderEarning: {
-    basePay: 0,
-    distancePay: 0,
-    surgePay: 0,
-    tips: 0,
-    totalEarning: 0,
-    credited: false
-  },
-
-  payment: {
-    mode: payment.mode,
-    status: payment.mode === "COD" ? "PENDING" : "SUCCESS"
-  },
-
-  orderStatus: "CREATED"
-});
-
- 
-    return res.status(201).json({
-      success: true,
-      orderId: order.orderId,
-      mongoId: order._id
-    });
- 
-  } catch (error) {
-    console.error("Create order error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Order creation failed"
-    });
-  }
+// 👉 Dummy transaction generator
+function generateTxn() {
+  return "TXN_" + crypto.randomBytes(6).toString("hex");
 }
+function generateOrderId(){
+
+      return "ORD-" + crypto.randomBytes(4).toString("hex").toUpperCase();
+}
+
+
+// async function createOrder(req, res) {
+//   try {
+//     const {
+//       vendorShopName,
+//       items,
+//       pickupAddress,
+//       deliveryAddress,
+//       payment
+//     } = req.body;
+ 
+//     if (!vendorShopName) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "vendorShopName is required"
+//       });
+//     }
+ 
+//     if (!items || !items.length) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Items are required"
+//       });
+//     }
+ 
+//     // 🔹 Calculate item totals ONLY
+//     let itemTotal = 0;
+//     const formattedItems = items.map(item => {
+//       const total = item.quantity * item.price;
+//       itemTotal += total;
+//       return {
+//         itemName: item.itemName,
+//         quantity: item.quantity,
+//         price: item.price,
+//         total
+//       };
+//     });
+ 
+//     // 🔹 Generate Order ID
+//     const orderId =
+//       "ORD-" + crypto.randomBytes(4).toString("hex").toUpperCase();
+ 
+//     // 🔹 Create Order (NO dynamic data)
+//     const order = await Order.create({
+//   orderId,
+//   vendorShopName,
+//   items: formattedItems,
+
+//   pickupAddress: {
+//     name: pickupAddress.name,
+//     addressLine: pickupAddress.addressLine,
+//     contactNumber: pickupAddress.contactNumber,
+//     location: {
+//       type: "Point",
+//       coordinates: [pickupAddress.lng, pickupAddress.lat]
+//     }
+//   },
+
+//   deliveryAddress: {
+//     name: deliveryAddress.name,
+//     addressLine: deliveryAddress.addressLine,
+//     contactNumber: deliveryAddress.contactNumber,
+//     location: {
+//       type: "Point",
+//       coordinates: [deliveryAddress.lng, deliveryAddress.lat]
+//     }
+//   },
+
+//   pricing: {
+//     itemTotal,
+//     deliveryFee: 0,
+//     tax: 0,
+//     platformCommission: 0,
+//     totalAmount: itemTotal
+//   },
+
+//   riderEarning: {
+//     basePay: 0,
+//     distancePay: 0,
+//     surgePay: 0,
+//     tips: 0,
+//     totalEarning: 0,
+//     credited: false
+//   },
+
+//   payment: {
+//     mode: payment.mode,
+//     status: payment.mode === "COD" ? "PENDING" : "SUCCESS"
+//   },
+
+//   orderStatus: "CREATED"
+// });
+
+ 
+//     return res.status(201).json({
+//       success: true,
+//       orderId: order.orderId,
+//       mongoId: order._id
+//     });
+ 
+//   } catch (error) {
+//     console.error("Create order error:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Order creation failed"
+//     });
+//   }
+// }
  
  
 // async function confirmOrder(req, res) {
@@ -189,6 +202,157 @@ async function createOrder(req, res) {
 //   }
 // }
 
+async function createOrder(req, res) {
+
+  try {
+
+    const body = req.body;
+
+    // ===============================
+    // 1️⃣ ADDRESS → LAT LNG
+    // ===============================
+
+    const pickupGeo = await getLatLng(
+      body.pickupAddress.addressLine
+    );
+
+    const deliveryGeo = await getLatLng(
+      body.deliveryAddress.addressLine
+    );
+
+
+    // ===============================
+    // 2️⃣ PAYMENT LOGIC
+    // ===============================
+
+    let paymentData = {
+      mode: body.payment.mode,
+      status: "PENDING"
+    };
+
+    // 👉 ONLINE → create dummy txn
+    if (body.payment.mode === "ONLINE") {
+
+      paymentData.transactionId = generateTxn();
+      paymentData.status = "SUCCESS";
+      paymentData.paidAt = new Date();
+
+    }
+
+    // 👉 COD
+    if (body.payment.mode === "COD") {
+
+      paymentData.codPaymentType =
+        body.payment.codPaymentType || "CASH";
+
+    }
+
+
+    // ===============================
+    // 3️⃣ CALCULATE ITEM TOTAL
+    // ===============================
+
+    let itemTotal = body.items.reduce(
+      (sum, i) => sum + i.total,
+      0
+    );
+
+
+    // ===============================
+    // 4️⃣ CREATE ORDER OBJECT
+    // ===============================
+
+    const order = new Order({
+
+      orderId: generateOrderId(),
+
+      vendorShopName: body.vendorShopName,
+
+      items: body.items,
+
+
+      // 👉 PICKUP WITH GEO
+      pickupAddress: {
+        name: body.pickupAddress.name,
+        addressLine: body.pickupAddress.addressLine,
+        contactNumber: body.pickupAddress.contactNumber,
+
+        location: {
+          type: "Point",
+          coordinates: [
+            pickupGeo.lng,
+            pickupGeo.lat
+          ]
+        }
+      },
+
+
+      // 👉 DELIVERY WITH GEO
+      deliveryAddress: {
+        name: body.deliveryAddress.name,
+        addressLine: body.deliveryAddress.addressLine,
+        contactNumber: body.deliveryAddress.contactNumber,
+
+        location: {
+          type: "Point",
+          coordinates: [
+            deliveryGeo.lng,
+            deliveryGeo.lat
+          ]
+        }
+      },
+
+
+      // 👉 PRICING (basic dummy)
+      pricing: {
+        itemTotal: itemTotal,
+        deliveryFee: 40,
+        tax: 5,
+        platformCommission: 10,
+        totalAmount: itemTotal + 45
+      },
+
+
+      // 👉 PAYMENT
+      payment: paymentData,
+
+
+      // 👉 COD AMOUNT IF COD
+      cod:
+        body.payment.mode === "COD"
+          ? {
+              amount: itemTotal + 45,
+              pendingAmount: itemTotal + 45
+            }
+          : undefined
+
+    });
+
+
+    await order.save();
+
+
+    // ===============================
+    // 5️⃣ RESPONSE
+    // ===============================
+
+    return res.status(201).json({
+      success: true,
+      message: "Order created successfully",
+      orderId: order.orderId,
+      payment: order.payment
+    });
+
+
+  } catch (err) {
+
+    return res.status(500).json({
+      success: false,
+      message: err.message
+    });
+
+  }
+}
 
  
 /* ===============================
@@ -1108,40 +1272,6 @@ async function acceptOrder(req, res) {
 }
 
  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
- 
-
- 
-
-
-
-
-
 
 async function rejectOrder(req, res) {
   try {

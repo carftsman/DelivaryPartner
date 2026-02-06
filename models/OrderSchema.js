@@ -337,10 +337,9 @@
 // module.exports = mongoose.model("Order", OrderSchema, "order");
 
  
-
-
 const mongoose=require('mongoose')
 const {Schema}=mongoose;
+
 const OrderSchema = new Schema(
 {
     orderId: { type: String, index: true },
@@ -368,25 +367,25 @@ const OrderSchema = new Schema(
     ],
  
    pickupAddress: {
-  name: String,
-  addressLine: String,
-  contactNumber: String,
-  location: {
-    type: { type: String, enum: ["Point"], default: "Point" },
-    coordinates: { type: [Number], required: true }
-  }
-},
-deliveryAddress: {
-  name: String,
-  addressLine: String,
-  contactNumber: String,
-  location: {
-    type: { type: String, enum: ["Point"], default: "Point" },
-    coordinates: { type: [Number], required: true }
-  }
-},
+      name: String,
+      addressLine: String,
+      contactNumber: String,
+      location: {
+        type: { type: String, enum: ["Point"], default: "Point" },
+        coordinates: { type: [Number], required: true }
+      }
+   },
 
- 
+   deliveryAddress: {
+      name: String,
+      addressLine: String,
+      contactNumber: String,
+      location: {
+        type: { type: String, enum: ["Point"], default: "Point" },
+        coordinates: { type: [Number], required: true }
+      }
+   },
+
     // Pricing
     pricing: {
       itemTotal: Number,
@@ -397,8 +396,6 @@ deliveryAddress: {
     },
  
     // Rider Earning
-    // Rider Earning
- 
     riderEarning: {
       basePay: { type: Number, default: 0 },
       distancePay: { type: Number, default: 0 },
@@ -423,7 +420,6 @@ deliveryAddress: {
       credited: { type: Boolean, default: false }
     },
  
-   
     // Order Status
     orderStatus: {
       type: String,
@@ -449,44 +445,59 @@ deliveryAddress: {
       reasonText: String
     },
  
-    // Payment
+    // ================= PAYMENT (ONLY UPDATED PART) =================
     payment: {
       mode: {
         type: String,
         enum: ["ONLINE", "COD"]
       },
+
+      // ✅ ONLY ADDED FIELD
+      codPaymentType: {
+        type: String,
+        enum: ["CASH", "UPI", "BANK_TRANSFER"],
+        default: "CASH"
+      },
+
       status: {
         type: String,
         enum: ["PENDING", "SUCCESS", "FAILED", "REFUNDED"]
       },
-      transactionId: String
+
+      transactionId: String,
+
+      // ✅ ONLY ADDED FIELD
+      paidAt: {
+        type: Date
+      }
     },
-      cod: {
-    amount: {
-      type: Number,
-      default: 0
-    },
+ 
+    cod: {
+      amount: {
+        type: Number,
+        default: 0
+      },
+
       pendingAmount: {
-    type: Number,
-    default: 0
-  },
+        type: Number,
+        default: 0
+      },
 
+      status: {
+        type: String,
+        enum: ["PENDING", "DEPOSITED"],
+        default: "PENDING",
+        index: true
+      },
 
-    status: {
-      type: String,
-      enum: ["PENDING", "DEPOSITED"],
-      default: "PENDING",
-      index: true
+      collectedAt: {
+        type: Date
+      },
+
+      depositedAt: {
+        type: Date
+      }
     },
-
-    collectedAt: {
-      type: Date
-    },
-
-    depositedAt: {
-      type: Date
-    }
-  },
 
     // Tracking summary
     tracking: {
@@ -495,21 +506,20 @@ deliveryAddress: {
     },
  
     allocation: {
-  candidateRiders: [
-    {
-      riderId: { type: Schema.Types.ObjectId, ref: "Rider" },
-      status: {
-        type: String,
-        enum: ["PENDING", "ACCEPTED", "REJECTED", "TIMEOUT"],
-        default: "PENDING"
-      },
-      notifiedAt: Date
-    }
-  ],
-  assignedAt: Date,
-  expiresAt: Date
-},
- 
+      candidateRiders: [
+        {
+          riderId: { type: Schema.Types.ObjectId, ref: "Rider" },
+          status: {
+            type: String,
+            enum: ["PENDING", "ACCEPTED", "REJECTED", "TIMEOUT"],
+            default: "PENDING"
+          },
+          notifiedAt: Date
+        }
+      ],
+      assignedAt: Date,
+      expiresAt: Date
+    },
  
     // Settlement flags
     settlement: {

@@ -548,7 +548,7 @@ router.patch("/:orderId/accept",riderAuthMiddleWare, acceptOrder);
  *       500:
  *         description: Internal server error
  */
-router.get("/:orderId/details",riderAuthMiddleWare, getOrderDetails);
+router.get("/:orderId/details", getOrderDetails);
 
 
 
