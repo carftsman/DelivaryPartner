@@ -14,7 +14,7 @@ const RiderIncentiveProgressSchema = new mongoose.Schema({
  
   incentiveType: {
     type: String,
-    enum: ["PEAK", "DAILY_TARGET", "WEEKLY_TARGET"],
+    enum: ["PEAK_SLOT", "DAILY_TARGET", "WEEKLY_TARGET"],
     required: false
   },
  
