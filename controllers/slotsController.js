@@ -948,25 +948,36 @@ exports.cancelSlot = async (req, res) => {
 
 
 
+
 exports.getCurrentSlot = async (req, res) => {
   try {
-    const { city, zone } = req.query;
-    // console.log("City:", city, "Zone:", zone);
+    const riderId = req.rider._id;
 
-    if (!city || !zone) {
+    //Fetch rider details
+    const rider = await Rider.findById(riderId).select("location");
+
+    if (!rider || !rider.location?.city || !rider.location?.area) {
       return res.status(400).json({
         success: false,
-        message: "city and zone are required"
+        message: "Rider location not configured"
       });
     }
 
+    const { city, area } = rider.location;
+    let zone = area;
+
+    //IST Time
     const now = new Date(
       new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
     );
-    const today = now.toISOString().split("T")[0]; // "2025-12-27"
-    // console.log("Today's date:", today);
-    // Fetch today's slot document
-    const daySlot = await Slot.findOne({ date: today, city, zone });
+
+    const today = now.toISOString().split("T")[0];
+    console.log(today)
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+    //  Fetch day slots
+    const daySlot = await Slot.findOne({ date: today ,city , zone});
+
 
     if (!daySlot || !daySlot.slots.length) {
       return res.json({
@@ -976,53 +987,72 @@ exports.getCurrentSlot = async (req, res) => {
       });
     }
 
-    // Convert current time to minutes → e.g., 16:27 = 987 minutes
-    const currentMinutes =
-      now.getHours() * 60 +
-      now.getMinutes();
+    const activeSlots = daySlot.slots.filter(s => s.status === "ACTIVE");
 
-    // Find next slot where slot.startTime > current time
-    const upcomingSlot = daySlot.slots
-      .filter(s => s.status === "ACTIVE")
-      .find(s => {
-        const [sh, sm] = s.startTime.split(":").map(Number);
-        const slotStartMinutes = sh * 60 + sm;
-        return slotStartMinutes > currentMinutes;
-      });
+    let currentSlot = null;
+    let nextSlot = null;
 
-    if (!upcomingSlot) {
+    for (const slot of activeSlots) {
+      const [sh, sm] = slot.startTime.split(":").map(Number);
+      const [eh, em] = slot.endTime.split(":").map(Number);
+
+      const startMinutes = sh * 60 + sm;
+      const endMinutes = eh * 60 + em;
+
+      // CURRENT SLOT
+      if (currentMinutes >= startMinutes && currentMinutes < endMinutes) {
+        if (slot.bookedRiders < slot.maxRiders) {
+          currentSlot = slot;
+          break;
+        }
+      }
+
+      // NEXT SLOT
+      if (!nextSlot && startMinutes > currentMinutes) {
+        if (slot.bookedRiders < slot.maxRiders) {
+          nextSlot = slot;
+        }
+      }
+    }
+
+    const selectedSlot = currentSlot || nextSlot;
+
+
+
+    if (!selectedSlot) {
       return res.json({
         success: true,
-        message: "No upcoming slots for today",
+        message: "No available slots for today",
         data: null
       });
     }
 
-    // testing
+    let delayMinutes = 0;
+    if (selectedSlot) {
+      const [sh, sm] = selectedSlot.startTime.split(":").map(Number);
+      const slotStartMinutes = sh * 60 + sm;
+      delayMinutes = Math.max(0, currentMinutes - slotStartMinutes);
+    }
 
-    // const todayStr = new Date().toISOString().split("T")[0];
-    // console.log("Today String:", todayStr);
-    // console.log("Upcoming Slot ID:", today);
-
+    // Check booking
     const isBooked = await SlotBooking.exists({
-      riderId: req.rider._id,
-      slotId: upcomingSlot.slotId,
-      date: today,      //STRING MATCH
+      riderId,
+      slotId: selectedSlot.slotId,
+      date: today,
       status: "BOOKED"
     });
 
-    console.log("Is Booked:", !!isBooked);
-
-
-
     return res.json({
       success: true,
-      message: !!isBooked ? "Slot is already booked" : "Present slot",
+      message: currentSlot
+        ? "Current slot available"
+        : "Current slot full, showing next slot",
       date: today,
       data: {
         daySlotId: daySlot._id,
-        slot: upcomingSlot,
-        isBooked: !!isBooked
+        slot: selectedSlot,
+        isBooked: !!isBooked,
+        delayMinutes: currentSlot ? delayMinutes : 0
       }
     });
 
@@ -1034,6 +1064,11 @@ exports.getCurrentSlot = async (req, res) => {
     });
   }
 };
+
+
+
+
+
 
 
 

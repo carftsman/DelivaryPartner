@@ -341,77 +341,80 @@ slotRouter.delete("/cancel/:bookingId", riderAuthMiddleWare, cancelSlot);
  * @swagger
  * /api/slots/current:
  *   get:
- *     summary: Get the next upcoming slot for today
+ *     summary: Get current running slot or next available slot for today
  *     tags:
  *       - Slots
  *     security:
  *       - bearerAuth: []
  *     description: >
- *       Returns the next available upcoming ACTIVE slot for the current date based on the user's local time.
- *       If no upcoming slot is found, response will return `data: null`.
- *
- *     parameters:
- *       - in: query
- *         name: city
- *         required: true
- *         schema:
- *           type: string
- *         description: City name (e.g., "Hyderabad")
- *
- *       - in: query
- *         name: zone
- *         required: true
- *         schema:
- *           type: string
- *         description: Zone name (e.g., "Gachibowli")
+ *       Returns the current ACTIVE slot based on rider location (derived from token).
+ *       If the current slot has already started, `delayMinutes` indicates how late the rider is.
+ *       If the current slot is full, the next available ACTIVE slot is returned.
+ *       If no slots are available for today, `data` will be null.
  *
  *     responses:
  *       200:
- *         description: Successfully fetched next upcoming slot
+ *         description: Successfully fetched slot information
  *         content:
  *           application/json:
- *             example:
- *               success: true
- *               message: "Upcoming slot for today"
- *               date: "2025-12-27"
- *               data:
- *                 daySlotId: "6950f9e348bc25e14034abf1"
- *                 slot:
- *                   slotId: "677fc1000000000000000017"
- *                   startTime: "18:00"
- *                   endTime: "20:00"
- *                   durationInHours: 2
- *                   bookedRiders: 12
- *                   maxRiders: 40
- *                   isPeakSlot: true
- *                   status: "ACTIVE"
+ *             examples:
+ *               currentSlot:
+ *                 summary: Current slot available
+ *                 value:
+ *                   success: true
+ *                   message: "Current slot available"
+ *                   date: "2025-12-27"
+ *                   data:
+ *                     daySlotId: "6950f9e348bc25e14034abf1"
+ *                     slot:
+ *                       slotId: "677fc1000000000000000017"
+ *                       startTime: "10:00"
+ *                       endTime: "12:00"
+ *                       durationInHours: 2
+ *                       bookedRiders: 12
+ *                       maxRiders: 40
+ *                       isPeakSlot: false
+ *                       status: "ACTIVE"
+ *                     isBooked: false
+ *                     delayMinutes: 18
+ *
+ *               nextSlot:
+ *                 summary: Current slot full, showing next slot
+ *                 value:
+ *                   success: true
+ *                   message: "Current slot full, showing next slot"
+ *                   date: "2025-12-27"
+ *                   data:
+ *                     daySlotId: "6950f9e348bc25e14034abf1"
+ *                     slot:
+ *                       slotId: "677fc1000000000000000018"
+ *                       startTime: "12:00"
+ *                       endTime: "14:00"
+ *                       durationInHours: 2
+ *                       bookedRiders: 5
+ *                       maxRiders: 40
+ *                       isPeakSlot: false
+ *                       status: "ACTIVE"
+ *                     isBooked: false
+ *                     delayMinutes: 0
+ *
+ *               noSlots:
+ *                 summary: No slots available for today
+ *                 value:
+ *                   success: true
+ *                   message: "No available slots for today"
+ *                   data: null
  *
  *       400:
- *         description: Missing city or zone
+ *         description: Rider location not configured
  *         content:
  *           application/json:
  *             example:
  *               success: false
- *               message: "city and zone are required"
+ *               message: "Rider location not configured"
  *
- *       200-NoSlots:
- *         description: No slots or no upcoming slots
- *         content:
- *           application/json:
- *             examples:
- *               noSlotsToday:
- *                 summary: No slots created for today
- *                 value:
- *                   success: true
- *                   message: "No slots created for today"
- *                   data: null
- *
- *               noUpcomingSlots:
- *                 summary: All slots for today already finished
- *                 value:
- *                   success: true
- *                   message: "No upcoming slots for today"
- *                   data: null
+ *       401:
+ *         description: Unauthorized (invalid or missing token)
  *
  *       500:
  *         description: Server error
