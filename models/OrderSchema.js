@@ -463,27 +463,6 @@ const OrderSchema = new Schema(
         type: String,
         enum: ["PENDING", "SUCCESS", "FAILED", "REFUNDED"]
       },
-<<<<<<< Updated upstream
-
-      transactionId: String,
-
-      // ✅ ONLY ADDED FIELD
-      paidAt: {
-        type: Date
-      }
-    },
- 
-    cod: {
-      amount: {
-        type: Number,
-        default: 0
-      },
-
-      pendingAmount: {
-        type: Number,
-        default: 0
-      },
-=======
       transactionId: String
     },
   //     cod: {
@@ -495,7 +474,6 @@ const OrderSchema = new Schema(
   //   type: Number,
   //   default: 0
   // },
->>>>>>> Stashed changes
 
       status: {
         type: String,
@@ -504,16 +482,6 @@ const OrderSchema = new Schema(
         index: true
       },
 
-<<<<<<< Updated upstream
-      collectedAt: {
-        type: Date
-      },
-
-      depositedAt: {
-        type: Date
-      }
-    },
-=======
   //   status: {
   //     type: String,
   //     enum: ["PENDING", "DEPOSITED","PARTIAL_DEPOSITED"],
@@ -542,7 +510,6 @@ cod: {
     collectedAt: Date,
     depositedAt: Date
   },
->>>>>>> Stashed changes
 
     // Tracking summary
     tracking: {
