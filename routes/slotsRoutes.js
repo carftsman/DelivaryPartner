@@ -1,7 +1,7 @@
 const express = require("express");
 const slotRouter = express.Router();
 
-const { getWeeklySlots, getDailySlots ,bookSlot , cancelSlot ,getCurrentSlot ,getDailySlotsWithStatus, getSlotHistory ,  getCurrentAndNextSlot} = require("../controllers/slotsController");
+const { getWeeklySlots, getDailySlots ,bookSlot , cancelSlot ,getCurrentSlot ,getDailySlotsWithStatus, getSlotHistory ,  getCurrentAndNextSlot ,getSlotCapacity} = require("../controllers/slotsController");
 const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
 
 /**
@@ -682,6 +682,93 @@ slotRouter.get("/history", riderAuthMiddleWare, getSlotHistory);
 
 
 slotRouter.get("/activeSlots", riderAuthMiddleWare, getCurrentAndNextSlot);
+
+
+/**
+ * @swagger
+ * /api/slots/{slotId}/capacity:
+ *   get:
+ *     summary: Get booking capacity and booked rider IDs for a slot
+ *     tags:
+ *       - Slots
+ *     security:
+ *       - bearerAuth: []
+ *     description: >
+ *       Returns booking capacity details for a specific slot on a given date.
+ *       Includes the list of booked rider IDs from the slot schema, total booked count,
+ *       available rider capacity, and booking eligibility.
+ *
+ *     parameters:
+ *       - in: path
+ *         name: slotId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Unique identifier of the slot
+ *
+ *       - in: query
+ *         name: date
+ *         required: false
+ *         schema:
+ *           type: string
+ *           example: "2025-12-27"
+ *         description: >
+ *           Slot date in YYYY-MM-DD format.
+ *           Defaults to today (IST) if not provided.
+ *
+ *     responses:
+ *       200:
+ *         description: Slot capacity details fetched successfully
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               message: "Slot capacity fetched successfully"
+ *               data:
+ *                 slotId: "677fc1000000000000000017"
+ *                 date: "2025-12-27"
+ *                 startTime: "10:00"
+ *                 endTime: "12:00"
+ *                 maxRiders: 40
+ *                 riders:
+ *                   - "69807073949c7c446ddbe1d9"
+ *                   - "69807073949c7c446ddbe1e0"
+ *                 bookedRidersCount: 2
+ *                 availableRiders: 38
+ *                 isFull: false
+ *                 canBook: true
+ *
+ *       400:
+ *         description: Missing or invalid slotId
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: false
+ *               message: "slotId is required"
+ *
+ *       404:
+ *         description: Slot not found for the given date
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: false
+ *               message: "Slot not found"
+ *
+ *       401:
+ *         description: Unauthorized (missing or invalid token)
+ *
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: false
+ *               message: "Server error"
+ */
+
+
+
+slotRouter.get("/:slotId/capacity", riderAuthMiddleWare, getSlotCapacity);
 
 
 module.exports = slotRouter;

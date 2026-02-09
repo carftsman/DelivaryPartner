@@ -1352,3 +1352,82 @@ exports.getCurrentAndNextSlot = async (req, res) => {
   }
 };
 
+
+// get riders 
+
+
+
+exports.getSlotCapacity = async (req, res) => {
+  try {
+    const { slotId } = req.params;
+
+    if (!slotId) {
+      return res.status(400).json({
+        success: false,
+        message: "slotId is required"
+      });
+    }
+
+    // Default date = today (IST)
+    const now = new Date(
+      new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
+    );
+    const date = req.query.date || now.toISOString().split("T")[0];
+
+    const daySlot = await Slot.findOne(
+      { date, "slots.slotId": slotId },
+      { "slots.$": 1, date: 1 }
+    );
+
+    if (!daySlot || !daySlot.slots.length) {
+      return res.status(404).json({
+        success: false,
+        message: "Slot not found"
+      });
+    }
+
+    const slot = daySlot.slots[0];
+
+    // ONLY count BOOKED riders
+    const bookedRiders = slot.riders.filter(
+      r => r.status === "BOOKED"
+    );
+
+    const bookedRidersCount = bookedRiders.length;
+
+    const availableRiders = Math.max(
+      0,
+      slot.maxRiders - bookedRidersCount
+    );
+
+    return res.json({
+      success: true,
+      message: "Slot capacity fetched successfully",
+      data: {
+        slotId: slot.slotId,
+        date,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        maxRiders: slot.maxRiders,
+
+        // return only ACTIVE bookings (optional but recommended)
+        riders: bookedRiders,
+
+        bookedRidersCount,
+        availableRiders,
+        isFull: availableRiders === 0,
+        canBook: availableRiders > 0
+      }
+    });
+
+  } catch (err) {
+    console.error("Slot Capacity Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
+  }
+};
+
+
+
