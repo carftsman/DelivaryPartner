@@ -674,6 +674,17 @@ currentOrderId: {
   ref: "Order",
   default: null
 },
+partnerId: {
+  type: String,
+  unique: true,
+  sparse: true,
+  index: true
+},
+
+isPartnerActive: {
+  type: Boolean,
+  default: false
+},
 
 fcmToken: {
   type: String,

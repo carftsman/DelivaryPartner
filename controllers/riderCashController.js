@@ -1,107 +1,102 @@
 const Rider = require("../models/RiderModel");
 const Order = require("../models/OrderSchema");
+const jwt = require("jsonwebtoken");
+
+
 exports.handoverCodCash = async (req, res) => {
   try {
-    if (!req.rider || !req.rider._id) {
-      return res.status(400).json({
-        success: false,
-        message: "Rider info missing"
-      });
-    }
+    const riderId = req.rider?._id;
+    if (!riderId) return res.status(401).json({ success: false, message: "Unauthorized rider" });
 
-    const riderId = req.rider._id;
     const { amount } = req.body;
+    if (!amount || amount <= 0) return res.status(400).json({ success: false, message: "Invalid handover amount" });
 
-    // 1️⃣ Validate amount
-    if (!amount || amount <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid handover amount"
-      });
-    }
+    const rider = await Rider.findById(riderId);
+    if (!rider) return res.status(404).json({ success: false, message: "Rider not found" });
 
-    // 2️⃣ Fetch rider cash-in-hand
-    const rider = await Rider.findById(riderId)
-      .select("cashInHand")
-      .lean();
+    let remainingAmount = Number(amount);
+    let depositedNow = 0;
+    const depositTime = new Date();
 
-    if (!rider) {
-      return res.status(404).json({
-        success: false,
-        message: "Rider not found"
-      });
-    }
-
-    const availableCash = rider.cashInHand?.balance || 0;
-
-    if (amount > availableCash) {
-      return res.status(400).json({
-        success: false,
-        message: "Handover amount exceeds available cash"
-      });
-    }
-
-    // 3️⃣ Reduce rider cash balance
-    const updatedBalance = availableCash - amount;
-
-    await Rider.updateOne(
-      { _id: riderId },
-      { $set: { "cashInHand.balance": updatedBalance } }
-    );
-
-    // 4️⃣ Apply handover to COD orders (FIFO)
-    let remainingAmount = amount;
-
+    // FIFO: oldest collected orders first
     const codOrders = await Order.find({
       riderId,
       "payment.mode": "COD",
-      "cod.status": { $in: ["PENDING", "PARTIALLY_DEPOSITED"] }
-    }).sort({ "cod.collectedAt": 1 });
+      "cod.status": { $in: ["PENDING", "PARTIAL_DEPOSITED"] }
+    }).sort({ "cod.collectedAt": 1, createdAt: 1 });
 
     for (const order of codOrders) {
       if (remainingAmount <= 0) break;
 
-      const pending = order.cod.pendingAmount;
+      const totalAmount = order.cod?.amount || order.pricing?.totalAmount || 0;
+      const alreadyDeposited = order.cod?.depositedAmount || 0;
+      const pendingBefore = totalAmount - alreadyDeposited;
+      if (pendingBefore <= 0) continue;
 
-      if (pending <= remainingAmount) {
-        // Fully deposited
-        remainingAmount -= pending;
+      let depositThisOrder = 0;
+
+      if (remainingAmount >= pendingBefore) {
+        // FULL DEPOSIT
+        order.cod.depositedAmount = totalAmount;
         order.cod.pendingAmount = 0;
         order.cod.status = "DEPOSITED";
-        order.cod.depositedAt = new Date();
+        depositThisOrder = pendingBefore;
+        remainingAmount -= pendingBefore;
       } else {
-        // Partial deposit
-        order.cod.pendingAmount -= remainingAmount;
+        // PARTIAL DEPOSIT
+        order.cod.depositedAmount = alreadyDeposited + remainingAmount;
+        order.cod.pendingAmount = totalAmount - order.cod.depositedAmount;
+        order.cod.status = "PARTIAL_DEPOSITED";
+        depositThisOrder = remainingAmount;
         remainingAmount = 0;
-        order.cod.status = "PARTIALLY_DEPOSITED";
       }
 
+      order.cod.depositedAt = depositTime;
+      order.markModified("cod");
       await order.save();
+
+      depositedNow += depositThisOrder;
     }
 
-    // 5️⃣ Response
+    // Update rider cash balance
+    rider.cashInHand.balance = Math.max((rider.cashInHand.balance || 0) - depositedNow, 0);
+    await rider.save();
+
     return res.status(200).json({
       success: true,
       message: "COD cash handed over successfully",
       data: {
-        handedOverAmount: amount,
-        remainingCashBalance: updatedBalance,
-        currency: "INR"
+        handedOverAmount: depositedNow,
+        remainingCashBalance: rider.cashInHand.balance,
+        currency: "INR",
       }
     });
 
   } catch (error) {
-    console.error("COD HANDOVER ERROR:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to handover COD cash"
-    });
+    console.error("handoverCodCash error:", error);
+    return res.status(500).json({ success: false, message: "Something went wrong" });
   }
 };
 
+
 exports.withdrawFromWallet = async (req, res) => {
   try {
-    const riderId = req.rider._id;
+    // ✅ Safely resolve riderId
+    let riderId = req.rider?._id;
+
+    if (!riderId && req.headers.authorization?.startsWith("Bearer ")) {
+      const token = req.headers.authorization.split(" ")[1];
+      const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+      riderId = decoded.riderId || decoded.id || decoded._id;
+    }
+
+    if (!riderId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized rider"
+      });
+    }
+
     const { amount } = req.body;
 
     // 1️⃣ Validate amount
@@ -113,7 +108,10 @@ exports.withdrawFromWallet = async (req, res) => {
     }
 
     // 2️⃣ Fetch rider wallet
-    const rider = await Rider.findById(riderId).select("wallet").lean();
+    const rider = await Rider.findById(riderId)
+      .select("wallet")
+      .lean();
+
     if (!rider) {
       return res.status(404).json({
         success: false,
@@ -121,7 +119,7 @@ exports.withdrawFromWallet = async (req, res) => {
       });
     }
 
-    const availableBalance = rider.wallet.balance;
+    const availableBalance = rider.wallet?.balance || 0;
 
     // 3️⃣ Business rules
     if (amount < 500) {

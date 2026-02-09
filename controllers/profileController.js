@@ -27,11 +27,17 @@ exports.getProfile = async (req, res) => {
         message: "Rider not found"
       });
     }
+    const dob = rider?.personalInfo?.dob;
+
+const formattedDob = dob
+  ? `${dob.getUTCFullYear()}-${dob.getUTCMonth() + 1}-${dob.getUTCDate()}`
+  : null;
+
 
     const data = {
       _id: rider._id,
 
-      driverId: rider.driverId,
+     partnerId: rider.partnerId,
       email: rider.email,
 
       phone: {
@@ -44,8 +50,10 @@ exports.getProfile = async (req, res) => {
       //   phoneNumber: rider.emergencyContact?.phoneNumber
       // },
 
-      personalInfo: rider.personalInfo,
-
+personalInfo: {
+    ...rider.personalInfo,
+    dob: formattedDob
+  },
             location: {
         streetAddress: rider.location?.streetAddress,
         area: rider.location?.area,
@@ -63,15 +71,17 @@ exports.getProfile = async (req, res) => {
     };
 
     // 🔥 Remove empty / undefined objects
-    Object.keys(data).forEach(key => {
-      if (
-        data[key] == null ||
-        (typeof data[key] === "object" &&
-          Object.keys(data[key]).length === 0)
-      ) {
-        delete data[key];
-      }
-    });
+Object.keys(data).forEach(key => {
+  if (key === "partnerId") return; // 👈 keep it always
+
+  if (
+    data[key] == null ||
+    (typeof data[key] === "object" &&
+      Object.keys(data[key]).length === 0)
+  ) {
+    delete data[key];
+  }
+});
 
     return res.status(200).json({
       success: true,
