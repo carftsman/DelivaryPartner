@@ -36,6 +36,7 @@ const fcmTokenRoutes = require("./routes/fcmTokenRoutes");
 const riderStatusRoutes = require("./routes/riderStatus.routes");
 const riderCashRoutes = require("./routes/riderCashRoutes");
 const orderStateReady=require('./routes/readyStateRouter')
+const rawPayloadRoutes = require("./routes/rawPayloadRoutes");
 
 
 // const offlineStoreRoute = require("./routes/offlineStoreRoute");
@@ -101,6 +102,7 @@ app.use("/api/profile/insurance", insuranceRoutes);
 app.use("/api/rider/incentives", riderIncentiveRoutes);
 
 app.use("/api/issues", issueRouter);
+app.use("/api/raw", rawPayloadRoutes);
 
 
 //new earnings routes 
