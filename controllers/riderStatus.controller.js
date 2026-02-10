@@ -84,15 +84,7 @@ exports.goOnline = async (req, res) => {
       });
     }
 
-    // Already online check
-    // if (riderData.riderStatus.isOnline) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: "Rider already online"
-    //   });
-    // }
-
-    // ❌ Block if account is suspended / KYC pending
+    
     if (
       riderData.deliveryStatus.inactiveReason === "ACCOUNT_SUSPENDED" ||
       riderData.deliveryStatus.inactiveReason === "KYC_PENDING"
@@ -118,7 +110,9 @@ exports.goOnline = async (req, res) => {
 
           // delivery active
           "deliveryStatus.isActive": true,
-          "deliveryStatus.inactiveReason": null
+          "deliveryStatus.inactiveReason": null,
+                isPartnerActive: true
+
         }
       },
       { new: true }
@@ -272,7 +266,9 @@ exports.goOffline = async (req, res) => {
 
           "deliveryStatus.isActive": false,
           "deliveryStatus.inactiveReason": reason,
-          "deliveryStatus.updatedAt": new Date()
+          "deliveryStatus.updatedAt": new Date(),
+                isPartnerActive: false
+
         }
       },
       { new: true }

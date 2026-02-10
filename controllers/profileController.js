@@ -62,6 +62,7 @@ personalInfo: {
         pincode: rider.location?.pincode
       },
 
+      isPartnerActive: rider.isPartnerActive,
 
       // vehicleInfo: rider.vehicleInfo,
       selfie: rider.selfie,

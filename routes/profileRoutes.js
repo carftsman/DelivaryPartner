@@ -143,6 +143,12 @@ router.put("/update", riderAuthMiddleWare,  upload.single("selfie"),
  *                     _id:
  *                       type: string
  *                       example: 694e527648bc25e14034aab0
+ *
+ *                     # ✅ NEW FIELD
+ *                     isPartnerActive:
+ *                       type: boolean
+ *                       example: true
+ *
  *                     phone:
  *                       type: object
  *                       properties:
@@ -171,6 +177,7 @@ router.put("/update", riderAuthMiddleWare,  upload.single("selfie"),
  *                         area:
  *                           type: string
  *                           example: Dwaraka Nagar
+ *
  *                     vehicleInfo:
  *                       type: object
  *                       properties:
@@ -221,7 +228,6 @@ router.put("/update", riderAuthMiddleWare,  upload.single("selfie"),
  *                   type: string
  *                   example: Server error
  */
-
 router.get("/rider/profile", riderAuthMiddleWare, getProfile);
 // Get bank details
 /**
