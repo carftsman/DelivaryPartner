@@ -1,5 +1,6 @@
 const Joi = require("joi");
 const Rider = require("../models/RiderModel");
+const { ensurePartnerId } = require("../services/partner.service");
 
 // Temp OTP store
 const otpStore = {};
@@ -64,6 +65,7 @@ exports.verifyOtp = async (req, res) => {
   if (otp !== otpRecord.otp)
     return res.status(400).json({ message: "Invalid OTP" });
 
+
   // OTP Success → Update Rider KYC
   await Rider.findByIdAndUpdate(riderId, {
     $set: {
@@ -74,8 +76,10 @@ exports.verifyOtp = async (req, res) => {
     }
   });
 
+
   return res.status(200).json({
     verified: true,
-    message: "OTP verified successfully"
+    message: "OTP verified successfully",
+
   });
 };

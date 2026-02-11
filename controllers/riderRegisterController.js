@@ -5,7 +5,7 @@ const { sendSMS } = require("../utils/twilio");
 const citiesData = require("../helpers/data.json");
 const { uploadToAzure } = require("../utils/azureUpload");
 const { generateTokens } = require("../utils/token");
-const { updateRiderAndCheckPartner } = require("../services/partner.service");
+const { ensurePartnerId } = require("../services/partner.service");
 
 
 
@@ -816,16 +816,14 @@ exports.completeKyc = async (req, res) => {
     rider.onboardingStage = "COMPLETED";
 
     await rider.save();
-    const updatedRider = await updateRiderAndCheckPartner(
-      { _id: riderId },
-      {}
-    );
+    
+    const updatedRider = await ensurePartnerId(rider._id);
 
     return res.status(200).json({
       success: true,
       message: "KYC completed and rider fully registered",
       partnerId: updatedRider?.partnerId || null,
-
+ 
       onboardingStage: rider.onboardingStage,
       onboardingProgress: rider.onboardingProgress,
       isFullyRegistered: rider.isFullyRegistered,

@@ -36,6 +36,12 @@ const {
  *                 message:
  *                   type: string
  *                   example: Rider is now ONLINE
+ *
+ *                 # ✅ NEW FIELD
+ *                 isPartnerActive:
+ *                   type: boolean
+ *                   example: true
+ *
  *                 riderStatus:
  *                   type: object
  *                   properties:
@@ -117,7 +123,6 @@ const {
  *                   example: Server Error
  */
 
-
 router.patch("/online", riderAuthMiddleWare, goOnline);
 /**
  * @swagger
@@ -157,6 +162,12 @@ router.patch("/online", riderAuthMiddleWare, goOnline);
  *                 message:
  *                   type: string
  *                   example: Rider is now OFFLINE
+ *
+ *                 # ✅ NEW FIELD
+ *                 isPartnerActive:
+ *                   type: boolean
+ *                   example: false
+ *
  *                 riderStatus:
  *                   type: object
  *                   properties:

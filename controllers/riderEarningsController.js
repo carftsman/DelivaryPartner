@@ -66,13 +66,110 @@ exports.getEarningsSummary = async (req, res) => {
 };
 
 
+// exports.new_getEarningsSummary = async (req, res) => {
+//   try {
+//     const riderId = req.rider._id;
+
+//     // -----------------------------
+//     // DATE RANGES (LOCAL DAY)
+//     // -----------------------------
+//     const now = new Date();
+
+//     const todayStart = new Date(now);
+//     todayStart.setHours(0, 0, 0, 0);
+
+//     const todayEnd = new Date(now);
+//     todayEnd.setHours(23, 59, 59, 999);
+
+//     // ISO week (Mon → Sun)
+//     const current = getCurrentISOWeek();
+//     const { start: weekStart, end: weekEnd } =
+//       getISOWeekRange(current.week, current.year);
+
+//     // Month start
+//     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+//     // -----------------------------
+//     // FETCH ALL REQUIRED ORDERS
+//     // -----------------------------
+//     const orders = await Order.find({
+//       riderId,
+//       orderStatus: "DELIVERED",
+//       updatedAt: { $gte: monthStart, $lte: todayEnd }
+//     });
+
+//     // -----------------------------
+//     // CALCULATIONS
+//     // -----------------------------
+//     let todayOrders = 0;
+//     let todayTotal = 0;
+
+//     let weekTotal = 0;
+
+//     let monthBase = 0;
+//     let monthIncentives = 0;
+//     let monthTips = 0;
+//     let monthTotal = 0;
+
+//     orders.forEach(order => {
+//       const deliveredAt = new Date(order.updatedAt);
+//       const earning = order.riderEarning || {};
+
+//       const totalEarning = earning.totalEarning || 0;
+//       const basePay = earning.basePay || 0;
+//       const incentive = earning.surgePay || 0;
+//       const tips = earning.tips || 0;
+
+//       // ---- TODAY ----
+//       if (deliveredAt >= todayStart && deliveredAt <= todayEnd) {
+//         todayOrders += 1;
+//         todayTotal += totalEarning;
+//       }
+
+//       // ---- THIS WEEK ----
+//       if (deliveredAt >= weekStart && deliveredAt <= weekEnd) {
+//         weekTotal += totalEarning;
+//       }
+
+//       // ---- THIS MONTH ----
+//       monthBase += basePay;
+//       monthIncentives += incentive;
+//       monthTips += tips;
+//       monthTotal += totalEarning;
+//     });
+
+//     // -----------------------------
+//     // RESPONSE (SAME SHAPE)
+//     // -----------------------------
+//     res.json({
+//       today: {
+//         orders: todayOrders,
+//         baseEarnings: 0,            // kept for compatibility
+//         incentives: 0,
+//         tips: 0,
+//         total: todayTotal
+//       },
+//       week: {
+//         total: weekTotal
+//       },
+//       month: {
+//         baseEarnings: monthBase,
+//         incentives: monthIncentives,
+//         tips: monthTips,
+//         total: monthTotal
+//       }
+//     });
+
+//   } catch (err) {
+//     console.error("Earnings summary error:", err);
+//     res.status(500).json({ message: "Internal server error" });
+//   }
+// };
+
 exports.new_getEarningsSummary = async (req, res) => {
   try {
     const riderId = req.rider._id;
 
-    // -----------------------------
-    // DATE RANGES (LOCAL DAY)
-    // -----------------------------
     const now = new Date();
 
     const todayStart = new Date(now);
@@ -81,31 +178,27 @@ exports.new_getEarningsSummary = async (req, res) => {
     const todayEnd = new Date(now);
     todayEnd.setHours(23, 59, 59, 999);
 
-    // ISO week (Mon → Sun)
     const current = getCurrentISOWeek();
     const { start: weekStart, end: weekEnd } =
       getISOWeekRange(current.week, current.year);
 
-    // Month start
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    // -----------------------------
-    // FETCH ALL REQUIRED ORDERS
-    // -----------------------------
     const orders = await Order.find({
       riderId,
       orderStatus: "DELIVERED",
       updatedAt: { $gte: monthStart, $lte: todayEnd }
     });
 
-    // -----------------------------
-    // CALCULATIONS
-    // -----------------------------
     let todayOrders = 0;
     let todayTotal = 0;
+    let todayBase = 0;
+    let todayIncentives = 0;
+    let todayTips = 0;
 
     let weekTotal = 0;
 
+    let monthOrders = 0;          // ✅ ADDED
     let monthBase = 0;
     let monthIncentives = 0;
     let monthTips = 0;
@@ -124,6 +217,9 @@ exports.new_getEarningsSummary = async (req, res) => {
       if (deliveredAt >= todayStart && deliveredAt <= todayEnd) {
         todayOrders += 1;
         todayTotal += totalEarning;
+        todayBase += basePay;
+        todayIncentives += incentive;
+        todayTips += tips;
       }
 
       // ---- THIS WEEK ----
@@ -132,27 +228,26 @@ exports.new_getEarningsSummary = async (req, res) => {
       }
 
       // ---- THIS MONTH ----
+      monthOrders += 1;           // ✅ ADDED
       monthBase += basePay;
       monthIncentives += incentive;
       monthTips += tips;
       monthTotal += totalEarning;
     });
 
-    // -----------------------------
-    // RESPONSE (SAME SHAPE)
-    // -----------------------------
     res.json({
       today: {
         orders: todayOrders,
-        baseEarnings: 0,            // kept for compatibility
-        incentives: 0,
-        tips: 0,
+        baseEarnings: todayBase,
+        incentives: todayIncentives,
+        tips: todayTips,
         total: todayTotal
       },
       week: {
         total: weekTotal
       },
       month: {
+        orders: monthOrders,      // ✅ ADDED
         baseEarnings: monthBase,
         incentives: monthIncentives,
         tips: monthTips,
@@ -165,6 +260,7 @@ exports.new_getEarningsSummary = async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
 
 
 // 2 Bar chart (Mon–Sun)

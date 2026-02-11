@@ -10,13 +10,14 @@ const {
  * @swagger
  * /api/rider/cod/handover:
  *   post:
+ *     summary: Handover COD cash collected by rider
+ *     description: >
+ *       Allows a rider to deposit the full COD cash collected.
+ *       Partial deposits are not allowed. The deposited amount must exactly match
+ *       the rider's cash-in-hand balance.
  *     tags:
  *       - Rider Cash
- *     summary: Handover COD cash by rider
- *     description: >
- *       Allows a rider to hand over collected COD cash.
- *       The system deposits the amount using FIFO logic (oldest COD orders first)
- *       and updates order deposit status and rider cash balance.
+ *       
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -30,11 +31,11 @@ const {
  *             properties:
  *               amount:
  *                 type: number
- *                 example: 500
- *                 description: Amount of COD cash being handed over
+ *                 example: 1125
+ *                 description: Full COD amount to be deposited
  *     responses:
  *       200:
- *         description: COD cash handed over successfully
+ *         description: COD cash deposited successfully
  *         content:
  *           application/json:
  *             schema:
@@ -45,21 +46,21 @@ const {
  *                   example: true
  *                 message:
  *                   type: string
- *                   example: COD cash handed over successfully
+ *                   example: COD cash deposited successfully
  *                 data:
  *                   type: object
  *                   properties:
- *                     handedOverAmount:
+ *                     depositedAmount:
  *                       type: number
- *                       example: 500
+ *                       example: 1125
  *                     remainingCashBalance:
  *                       type: number
- *                       example: 700
+ *                       example: 0
  *                     currency:
  *                       type: string
  *                       example: INR
  *       400:
- *         description: Invalid handover amount
+ *         description: Invalid request or partial deposit attempted
  *         content:
  *           application/json:
  *             schema:
@@ -70,7 +71,7 @@ const {
  *                   example: false
  *                 message:
  *                   type: string
- *                   example: Invalid handover amount
+ *                   example: Partial deposit not allowed. Deposit full amount ₹1125
  *       401:
  *         description: Unauthorized rider
  *         content:
@@ -98,7 +99,7 @@ const {
  *                   type: string
  *                   example: Rider not found
  *       500:
- *         description: Server error
+ *         description: Internal server error
  *         content:
  *           application/json:
  *             schema:
@@ -109,7 +110,7 @@ const {
  *                   example: false
  *                 message:
  *                   type: string
- *                   example: Something went wrong
+ *                   example: Failed to handover COD cash
  */
 
 // ✅ Attach middleware here

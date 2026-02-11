@@ -1,29 +1,24 @@
 const Rider = require("../models/RiderModel");
-const { isKycComplete } = require("../utils/checkKycCompletion");
 const { generatePartnerId } = require("../utils/generatePartnerId");
 
-exports.updateRiderAndCheckPartner = async (query, updateData) => {
-  // 1️⃣ Update rider
-  const rider = await Rider.findOneAndUpdate(
-    query,
-    { $set: updateData },
-    { new: true }
-  );
+exports.ensurePartnerId = async (riderId) => {
+  const rider = await Rider.findById(riderId);
 
   if (!rider) return null;
 
-  // 2️⃣ Check if partnerId already exists
-  if (rider.partnerId) return rider;
+  const kycCompleted =
+    rider?.onboardingProgress?.kycCompleted === true;
 
-  // 3️⃣ Check KYC completeness
-  if (isKycComplete(rider)) {
-    rider.partnerId = generatePartnerId();
+  console.log("ensurePartnerId → kycCompleted:", kycCompleted);
+  console.log("ensurePartnerId → existing partnerId:", rider.partnerId);
+
+  if (kycCompleted && !rider.partnerId) {
+    rider.partnerId = generatePartnerId(); // PIDxxxxx
     rider.isPartnerActive = true;
 
-    rider.deliveryStatus.isActive = true;
-    rider.deliveryStatus.updatedAt = new Date();
+    await rider.save(); // 🔥 THIS SAVES TO DB
 
-    await rider.save();
+    console.log("partnerId generated:", rider.partnerId);
   }
 
   return rider;

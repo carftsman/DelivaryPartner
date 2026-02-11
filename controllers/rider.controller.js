@@ -367,138 +367,211 @@ exports.getSlotHistory = async (req, res) => {
 //     });
 //   }
 // };
+// exports.getCashInHand = async (req, res) => {
+//   try {
+//     const riderId = req.rider?._id;
+//     if (!riderId) return res.status(401).json({ success: false, message: "Unauthorized rider" });
+
+//     const rider = await Rider.findById(riderId).select("cashInHand").lean();
+//     if (!rider) return res.status(404).json({ success: false, message: "Rider not found" });
+
+//     const cashBalance = rider.cashInHand?.balance || 0;
+//     const cashLimit = rider.cashInHand?.limit || 2500;
+
+//     const orders = await Order.find({ riderId, "payment.mode": "COD" })
+//       .select("orderId deliveryAddress.name pricing.totalAmount cod")
+//       .sort({ "cod.collectedAt": -1 })
+//       .lean();
+//       let pendingOrdersCount = 0;
+// let pendingAmount = 0;
+
+// let totalCollected = 0;
+// let totalDeposited = 0;
+
+// let latestDeposit = 0;
+// let latestDepositAt = null;
+
+
+// const cashOrderHistory = orders.map(order => {
+//   const totalAmount =
+//     order.cod?.amount ||
+//     order.pricing?.totalAmount ||
+//     0;
+
+//   const depositedAmount = order.cod?.depositedAmount || 0;
+//   const pending = Math.max(totalAmount - depositedAmount, 0);
+
+//   // ✅ total COD collected
+//   totalCollected += totalAmount;
+
+//   // ✅ total deposited
+//   totalDeposited += depositedAmount;
+
+//   // ✅ latest deposit ONLY
+//   if (
+//     order.cod?.depositedAt &&
+//     (!latestDepositAt || order.cod.depositedAt > latestDepositAt)
+//   ) {
+//     latestDepositAt = order.cod.depositedAt;
+//     latestDeposit = depositedAmount;
+//   }
+
+//   if (pending > 0) {
+//     pendingOrdersCount++;
+//     pendingAmount += pending;
+//   }
+
+//   const status =
+//     pending === 0
+//       ? "DEPOSITED"
+//       : depositedAmount > 0
+//       ? "PARTIAL_DEPOSITED"
+//       : "PENDING";
+
+//   return {
+//     orderId: order.orderId,
+//     customerName: order.deliveryAddress?.name || "Customer",
+//     totalAmount,
+//     depositedAmount,
+//     pendingAmount: pending,
+//     status,
+//     collectedAt: order.cod?.collectedAt || null,
+//     depositedAt: order.cod?.depositedAt || null
+//   };
+// });
+
+//     return res.status(200).json({
+//       success: true,
+//       data: {
+//         cashSummary: {
+//           // totalCashCollected: pendingAmount + (cashBalance || 0),
+//           totalCashCollected: cashBalance ,
+
+//           currency: "INR",
+//           toDeposit: cashBalance,
+//           depositRequired: cashBalance > cashLimit
+//         },
+//         latestDeposit,
+//         pendingOrdersSummary: {
+//           pendingOrdersCount,
+//           pendingAmount
+//         },
+//         cashOrderHistory,
+//         rules: {
+//           depositWithinHours: 24,
+//           warningMessage: "Cash must be deposited within 24 hours of collection. Failure to deposit may result in account suspension."
+//         }
+//       }
+//     });
+
+//   } catch (error) {
+//     console.error("CASH SUMMARY ERROR:", error);
+//     return res.status(500).json({ success: false, message: "Failed to fetch cash summary" });
+//   }
+// };
 exports.getCashInHand = async (req, res) => {
   try {
     const riderId = req.rider?._id;
-    if (!riderId) return res.status(401).json({ success: false, message: "Unauthorized rider" });
+    if (!riderId) {
+      return res.status(401).json({ success: false, message: "Unauthorized rider" });
+    }
 
-    const rider = await Rider.findById(riderId).select("cashInHand").lean();
-    if (!rider) return res.status(404).json({ success: false, message: "Rider not found" });
-
-    const cashBalance = rider.cashInHand?.balance || 0;
-    const cashLimit = rider.cashInHand?.limit || 2500;
-
-    const orders = await Order.find({ riderId, "payment.mode": "COD" })
-      .select("orderId deliveryAddress.name pricing.totalAmount cod")
-      .sort({ "cod.collectedAt": -1 })
+    const orders = await Order.find({
+      riderId,
+      "payment.mode": "COD",
+    })
+      .sort({ createdAt: -1 })
       .lean();
-      let pendingOrdersCount = 0;
-let pendingAmount = 0;
 
-let totalCollected = 0;
-let totalDeposited = 0;
+    let pendingOrdersCount = 0;
+    let pendingAmount = 0;
+    let latestDeposit = 0;
+    let latestDepositAt = null;
 
-let latestDeposit = 0;
-let latestDepositAt = null;
+    const cashOrderHistory = [];
 
+    for (const order of orders) {
+      // ✅ SAFE TOTAL AMOUNT
+      const totalAmount =
+        Number(order.cod?.amount) ||
+        Number(order.pricing?.totalAmount) ||
+        0;
 
-    // let pendingOrdersCount = 0;
-    // let pendingAmount = 0;
-    // let latestDeposit = 0;
+      const depositedAmount = Number(order.cod?.depositedAmount || 0);
 
-    // const cashOrderHistory = orders.map(order => {
-    //   const totalAmount = order.cod?.amount || order.pricing?.totalAmount || 0;
-    //   const depositedAmount = order.cod?.depositedAmount || 0;
-    //   const pending = order.cod?.pendingAmount != null ? order.cod.pendingAmount : totalAmount - depositedAmount;
+      // ✅ SAFE PENDING
+      let pending =
+        Number(order.cod?.pendingAmount);
 
-    //   // Use status from DB directly
-    //   const status = order.cod?.status || (pending === 0 ? "DEPOSITED" : depositedAmount > 0 ? "PARTIAL_DEPOSITED" : "PENDING");
+      if (isNaN(pending)) {
+        pending = Math.max(totalAmount - depositedAmount, 0);
+      }
 
-    //   if (pending > 0) {
-    //     pendingOrdersCount++;
-    //     pendingAmount += pending;
-    //   }
+      if (pending > 0) {
+        pendingOrdersCount++;
+        pendingAmount += pending;
+      }
 
-    //   // Sum latest deposit (total deposited in all orders)
-    //   latestDeposit += depositedAmount;
+      if (
+        order.cod?.depositedAt &&
+        (!latestDepositAt || order.cod.depositedAt > latestDepositAt)
+      ) {
+        latestDepositAt = order.cod.depositedAt;
+        latestDeposit = depositedAmount;
+      }
 
-    //   return {
-    //     orderId: order.orderId,
-    //     customerName: order.deliveryAddress?.name || "Customer",
-    //     totalAmount,
-    //     depositedAmount,
-    //     pendingAmount: pending,
-    //     status,
-    //     collectedAt: order.cod?.collectedAt || null,
-    //     depositedAt: order.cod?.depositedAt || null
-    //   };
-    // });
-const cashOrderHistory = orders.map(order => {
-  const totalAmount =
-    order.cod?.amount ||
-    order.pricing?.totalAmount ||
-    0;
+      cashOrderHistory.push({
+        orderId: order.orderId,
+        customerName: order.deliveryAddress?.name || "Customer",
+        totalAmount,
+        depositedAmount,
+        pendingAmount: pending,
+        status:
+          pending === 0
+            ? "DEPOSITED"
+            : depositedAmount > 0
+            ? "PARTIAL_DEPOSITED"
+            : "PENDING",
+        collectedAt: order.cod?.collectedAt || null,
+        depositedAt: order.cod?.depositedAt || null,
+      });
+    }
 
-  const depositedAmount = order.cod?.depositedAmount || 0;
-  const pending = Math.max(totalAmount - depositedAmount, 0);
-
-  // ✅ total COD collected
-  totalCollected += totalAmount;
-
-  // ✅ total deposited
-  totalDeposited += depositedAmount;
-
-  // ✅ latest deposit ONLY
-  if (
-    order.cod?.depositedAt &&
-    (!latestDepositAt || order.cod.depositedAt > latestDepositAt)
-  ) {
-    latestDepositAt = order.cod.depositedAt;
-    latestDeposit = depositedAmount;
-  }
-
-  if (pending > 0) {
-    pendingOrdersCount++;
-    pendingAmount += pending;
-  }
-
-  const status =
-    pending === 0
-      ? "DEPOSITED"
-      : depositedAmount > 0
-      ? "PARTIAL_DEPOSITED"
-      : "PENDING";
-
-  return {
-    orderId: order.orderId,
-    customerName: order.deliveryAddress?.name || "Customer",
-    totalAmount,
-    depositedAmount,
-    pendingAmount: pending,
-    status,
-    collectedAt: order.cod?.collectedAt || null,
-    depositedAt: order.cod?.depositedAt || null
-  };
-});
+    const MAX_LIMIT = 2500;
 
     return res.status(200).json({
       success: true,
       data: {
         cashSummary: {
-          totalCashCollected: pendingAmount + (cashBalance || 0),
+          totalCashCollected: pendingAmount, // ✅ WILL MATCH DB (2100)
           currency: "INR",
-          toDeposit: cashBalance,
-          depositRequired: cashBalance > cashLimit
+          toDeposit: pendingAmount,
+          depositRequired: pendingAmount > 0,
+          maxAllowed: MAX_LIMIT,
+          canTakeNewOrders: pendingAmount <= MAX_LIMIT,
+          depositMode: "FULL_ONLY",
         },
         latestDeposit,
         pendingOrdersSummary: {
           pendingOrdersCount,
-          pendingAmount
+          pendingAmount,
         },
         cashOrderHistory,
         rules: {
           depositWithinHours: 24,
-          warningMessage: "Cash must be deposited within 24 hours of collection. Failure to deposit may result in account suspension."
-        }
-      }
+          warningMessage:
+            "Partial deposit is not allowed. Rider must deposit full pending cash. COD orders are blocked if limit exceeds ₹2500.",
+        },
+      },
     });
-
   } catch (error) {
-    console.error("CASH SUMMARY ERROR:", error);
-    return res.status(500).json({ success: false, message: "Failed to fetch cash summary" });
+    console.error("getCashInHand error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch cash balance",
+    });
   }
 };
-
 
 
 exports.getWallet = async (req, res) => {
