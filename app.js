@@ -18,6 +18,9 @@ const earningsRoutes = require("./routes/earningsRoutes");
 const adminRouterIncentives = require("./routes/adminInccentiveRoutes");
 const riderIncentiveRoutes = require("./routes/incentiveRiderRoutes");
 const webIncentiveRoutes = require("./routes/order.routes");
+const riderIncentiveProgressRoutes = require("./routes/riderIncentiveProgress.routes");
+
+
 
 
 // const webRiderRoutes = require("./routes/rider.routes");
@@ -36,6 +39,7 @@ const fcmTokenRoutes = require("./routes/fcmTokenRoutes");
 const riderStatusRoutes = require("./routes/riderStatus.routes");
 const riderCashRoutes = require("./routes/riderCashRoutes");
 const orderStateReady=require('./routes/readyStateRouter')
+
 
 
 // const offlineStoreRoute = require("./routes/offlineStoreRoute");
@@ -125,6 +129,12 @@ app.use("/api/web",webIncentiveRoutes)
 
 app.use("/api", pricingConfigRoutes);
 
+app.use(
+  "/api/rider/incentives",
+  riderIncentiveProgressRoutes
+);
+
+
 
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/rider/notifications", fcmTokenRoutes);
@@ -134,6 +144,9 @@ app.use("/api", riderCashRoutes);
 
 //orderState Ready
 app.use('/api',orderStateReady)
+app.use("/api/rider-incentives", riderIncentiveProgressRoutes);
+
+
 
 
 

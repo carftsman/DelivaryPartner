@@ -1,5 +1,5 @@
 const mongoose=require('mongoose');
-
+ 
 const RiderIncentiveProgressSchema = new mongoose.Schema({
   riderId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -61,3 +61,5 @@ const RiderIncentiveProgressSchema = new mongoose.Schema({
   "RiderIncentiveProgress",
   RiderIncentiveProgressSchema
 );
+ 
+ 

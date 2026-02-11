@@ -15,6 +15,8 @@ exports.riderAuthMiddleWare = async (req, res, next) => {
 
     const token = header.split(" ")[1];
 
+
+
     // Verify access token
     let decoded;
     try {
@@ -58,3 +60,6 @@ exports.riderAuthMiddleWare = async (req, res, next) => {
     });
   }
 };
+
+
+
