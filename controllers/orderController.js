@@ -770,13 +770,54 @@ async function confirmOrder(req, res) {
     /* ===============================
        2️⃣ FETCH ELIGIBLE RIDERS
     =============================== */
-    const riders = await Rider.find({
-      // "deliveryStatus.isActive": true,
+    // const riders = await Rider.find({
+    //   // "deliveryStatus.isActive": true,
+    //   orderState: "READY",
+    //   "riderStatus.isOnline": true
+    // })
+    //   .limit(10)
+    //   .select("_id");
+     const now = new Date();
+
+const riders = await Rider.aggregate([
+  {
+    $match: {
       orderState: "READY",
       "riderStatus.isOnline": true
-    })
-      .limit(10)
-      .select("_id");
+    }
+  },
+  {
+    $lookup: {
+      from: "slotbookings",
+      let: { riderId: "$_id" },
+      pipeline: [
+        {
+          $match: {
+            $expr: {
+              $and: [
+                { $eq: ["$riderId", "$$riderId"] },
+                { $eq: ["$status", "BOOKED"] },
+                { $gte: ["$slotEndAt", now] } // active + upcoming
+              ]
+            }
+          }
+        }
+      ],
+      as: "validSlots"
+    }
+  },
+  {
+    $match: {
+      "validSlots.0": { $exists: true }
+    }
+  },
+  {
+    $limit: 10
+  },
+  {
+    $project: { _id: 1 }
+  }
+]);
 
     // const riders = await Rider.find({}).limit(10);
 
