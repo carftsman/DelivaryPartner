@@ -1802,14 +1802,7 @@ const getWeekKey = (date = new Date()) => {
   return `${year}-W${week}`;
 
 };
- 
-const isPeakSlot = (date) => {
 
-  const hour = new Date(date).getHours();
-
-  return hour >= 6 && hour < 10; // example peak slot
-
-};
  
 /* ===============================
 
@@ -1959,34 +1952,62 @@ async function deliverOrder(req, res) {
    8️⃣ INCENTIVE PROGRESS UPDATE
 =============================== */
 
+/* ===============================
+
+   8️⃣ INCENTIVE PROGRESS UPDATE
+
+=============================== */
+ 
+/* ===============================
+   8️⃣ INCENTIVE PROGRESS UPDATE
+=============================== */
+
 const incentives = await Incentive.find({ status: "ACTIVE" });
 
 const dateKey = getDateKey();
 const weekKey = getWeekKey();
-const peak = isPeakSlot(order.tracking.deliveredAt);
+
+/* 🔥 SLOT BASED PEAK DETECTION */
+let slot = null;
+let isPeak = false;
+
+if (order.slotId) {
+  slot = await Slot.findById(order.slotId);
+  if (slot && slot.isPeakSlot) {
+    isPeak = true;
+  }
+}
 
 for (const incentive of incentives) {
 
-  /* 🔥 PEAK SLOT INCENTIVE */
-  if (incentive.incentiveType === "PEAK_SLOT" && peak) {
+  /* ===============================
+     🔥 PEAK SLOT INCENTIVE
+  =============================== */
+  if (incentive.incentiveType === "PEAK_SLOT" && isPeak) {
 
     const progress = await RiderIncentiveProgress.findOneAndUpdate(
-      { riderId, incentiveId: incentive._id, date: dateKey },
-
       {
-        $inc: { totalOrders: 1, peakOrders: 1 },
-
+        riderId,
+        incentiveId: incentive._id,
+        date: dateKey
+      },
+      {
+        $inc: {
+          totalOrders: 1,
+          peakOrders: 1
+        },
         $setOnInsert: {
-          incentiveType: incentive.incentiveType
+          incentiveType: "PEAK",
+          slotInfo: {
+            slotStart: slot.startTime,
+            slotEnd: slot.endTime
+          }
         }
       },
-
-      { upsert: true, new: true, runValidators: true }
+      { upsert: true, new: true }
     );
 
-    const peakSlabs = incentive.slabs?.[0]?.peak || [];
-
-    const slab = peakSlabs.find(s =>
+    const slab = incentive.slabs?.find(s =>
       progress.peakOrders >= s.minOrders &&
       progress.peakOrders <= s.maxOrders
     );
@@ -1998,72 +2019,103 @@ for (const incentive of incentives) {
     }
   }
 
-  /* 🔥 DAILY TARGET INCENTIVE */
+  /* ===============================
+     🔥 DAILY TARGET INCENTIVE
+  =============================== */
   if (incentive.incentiveType === "DAILY_TARGET") {
 
     const progress = await RiderIncentiveProgress.findOneAndUpdate(
-      { riderId, incentiveId: incentive._id, date: dateKey },
-
+      {
+        riderId,
+        incentiveId: incentive._id,
+        date: dateKey
+      },
       {
         $inc: {
           totalOrders: 1,
-          peakOrders: peak ? 1 : 0,
-          normalOrders: peak ? 0 : 1
+          peakOrders: isPeak ? 1 : 0,
+          normalOrders: isPeak ? 0 : 1
         },
-
         $setOnInsert: {
-          incentiveType: incentive.incentiveType
+          incentiveType: "DAILY_TARGET"
         }
       },
-
-      { upsert: true, new: true, runValidators: true }
+      { upsert: true, new: true }
     );
 
     if (
-      progress.peakOrders >= incentive.slotRules.minPeakSlots &&
-      progress.normalOrders >= incentive.slotRules.minNormalSlots
+      progress.totalOrders >= incentive.minOrders &&
+      progress.peakOrders >= incentive.slotRules.minPeakSlots
     ) {
       progress.eligible = true;
+      progress.achievedReward = incentive.rewardAmount;
       await progress.save();
     }
   }
 
-  /* 🔥 WEEKLY TARGET INCENTIVE */
+  /* ===============================
+     🔥 WEEKLY TARGET INCENTIVE  ← FIXED
+  =============================== */
+
   if (incentive.incentiveType === "WEEKLY_TARGET") {
 
     const progress = await RiderIncentiveProgress.findOneAndUpdate(
-      { riderId, incentiveId: incentive._id, week: weekKey },
-
+      {
+        riderId,
+        incentiveId: incentive._id,
+        week: weekKey
+      },
       {
         $setOnInsert: {
-          incentiveType: incentive.incentiveType
+          incentiveType: "WEEKLY_TARGET",
+          weeklyProgress: {
+            eligibleDays: 0,
+            dailyOrderMap: {}
+          }
         }
       },
-
-      { upsert: true, new: true, runValidators: true }
+      { upsert: true, new: true }
     );
 
-    if (!progress.dailyOrders) {
-      progress.dailyOrders = new Map();
+    /* ====== 🔥 FIX START ====== */
+
+    if (!progress.weeklyProgress) {
+      progress.weeklyProgress = {
+        eligibleDays: 0,
+        dailyOrderMap: {}
+      };
     }
 
-    progress.eligibleDays = progress.eligibleDays || 0;
-
-    const todayCount = progress.dailyOrders.get(dateKey) || 0;
-    progress.dailyOrders.set(dateKey, todayCount + 1);
-
-    if (todayCount + 1 >= incentive.weeklyRules.minOrdersPerDay) {
-      progress.eligibleDays += 1;
+    if (!progress.weeklyProgress.dailyOrderMap) {
+      progress.weeklyProgress.dailyOrderMap = {};
     }
 
-    if (progress.eligibleDays >= incentive.weeklyRules.totalDaysInWeek) {
+    const map = progress.weeklyProgress.dailyOrderMap;
+
+    const todayCount = map[dateKey] || 0;
+
+    map[dateKey] = todayCount + 1;
+
+    if (todayCount + 1 === incentive.weeklyRules.minOrdersPerDay) {
+      progress.weeklyProgress.eligibleDays += 1;
+    }
+
+    if (
+      progress.weeklyProgress.eligibleDays >=
+      incentive.weeklyRules.totalDaysInWeek
+    ) {
       progress.eligible = true;
       progress.achievedReward = incentive.maxRewardPerWeek;
     }
 
     await progress.save();
+
+    /* ====== 🔥 FIX END ====== */
   }
 }
+
+
+ 
  
     /* 9️⃣ RESPONSE */
 
