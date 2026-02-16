@@ -147,6 +147,7 @@ app.use("/api", riderCashRoutes);
 //orderState Ready
 app.use('/api',orderStateReady)
 app.use("/api/rider-incentives", riderIncentiveProgressRoutes);
+app.use("/api/rider", require("./routes/availableRidersRoutes"));
 
 
 
