@@ -8,7 +8,9 @@ const mongoose=require('mongoose')
 const { getLatLng } = require("../services/geocodeService");
 const Incentive = require("../models/IncentiveSchema");
 const RiderIncentiveProgress = require("../models/RiderIncentiveProgressSchema");
-      
+const SlotBooking=require("../models/SlotBookingModel")
+const WeeklySlot = require("../models/SlotModel"); 
+
 
 
 // 👉 Dummy transaction generator
@@ -444,46 +446,7 @@ async function createOrder(req, res) {
 // }
 //2nd line is new
 
-async function getRouteInfo(pickupAddress, deliveryAddress) {
-  if (!pickupAddress || !deliveryAddress) {
-    throw new Error("Pickup or Delivery address missing");
-  }
 
-  const pickupCoords = pickupAddress.location?.coordinates;
-  const dropCoords = deliveryAddress.location?.coordinates;
-
-  if (
-    !Array.isArray(pickupCoords) || pickupCoords.length !== 2 ||
-    !Array.isArray(dropCoords) || dropCoords.length !== 2
-  ) {
-    throw new Error("Invalid pickup/delivery coordinates");
-  }
-
-  const [pickupLng, pickupLat] = pickupCoords;
-  const [dropLng, dropLat] = dropCoords;
-
-  const response = await axios.get(
-    "https://maps.googleapis.com/maps/api/directions/json",
-    {
-      params: {
-        origin: `${pickupLat},${pickupLng}`,
-        destination: `${dropLat},${dropLng}`,
-        key: process.env.GOOGLE_KEY
-      }
-    }
-  );
-
-  if (!response.data.routes || response.data.routes.length === 0) {
-    throw new Error("No route found between pickup and drop");
-  }
-
-  const leg = response.data.routes[0].legs[0];
-
-  return {
-    distanceKm: Number((leg.distance.value / 1000).toFixed(2)),
-    etaMinutes: Math.ceil(leg.duration.value / 60)
-  };
-}
 
 
 
@@ -744,13 +707,468 @@ async function getRouteInfo(pickupAddress, deliveryAddress) {
 // }
 
 
+// async function confirmOrder(req, res) {
+//   try {
+//     const { orderId } = req.params;
+
+//     /* ===============================
+//        1️⃣ FETCH ORDER
+//     =============================== */
+//     const order = await Order.findOne({ orderId });
+
+//     if (!order) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Order not found"
+//       });
+//     }
+
+//     if (order.orderStatus !== "CREATED") {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Order already processed"
+//       });
+//     }
+
+//     /* ===============================
+//        2️⃣ FETCH ELIGIBLE RIDERS
+//     =============================== */
+//     const riders = await Rider.find({
+//       // "deliveryStatus.isActive": true,
+//       orderState: "READY",
+//       "riderStatus.isOnline": true
+//     })
+//       .limit(10)
+//       .select("_id");
+
+//     // const riders = await Rider.find({}).limit(10);
+
+
+//     if (!riders.length) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "No riders available"
+//       });
+//     }
+
+//     /* ===============================
+//        3️⃣ UPDATE ORDER STATUS + ALLOCATION
+//     =============================== */
+//     order.orderStatus = "CONFIRMED";
+//     order.allocation = {
+//       candidateRiders: riders.map(r => ({
+//         riderId: r._id,
+//         status: "PENDING",
+//         notifiedAt: new Date()
+//       })),
+//       expiresAt: new Date(Date.now() + 120 * 1000)
+//     };
+
+//     await order.save();
+
+//     /* ===============================
+//        4️⃣ DISTANCE + ETA
+//     =============================== */
+//     const routeInfo = await getRouteInfo(
+//       order.pickupAddress,
+//       order.deliveryAddress
+//     );
+
+//     /* ===============================
+//        5️⃣ FETCH PRICING CONFIG
+//     =============================== */
+//     const pricingConfig = await PricingConfig.findOne({ isActive: true });
+//     if (!pricingConfig) {
+//       throw new Error("Pricing config not found");
+//     }
+
+//     /* ===============================
+//        6️⃣ RIDER EARNING CALCULATION
+//     =============================== */
+//     let basePay = pricingConfig.baseFare.baseAmount;
+//     let distancePay = 0;
+//     let surgePay = 0;
+//     let appliedSurges = [];
+
+//     const distanceKm = routeInfo.distanceKm;
+
+//     // Distance pay
+//     if (distanceKm > pricingConfig.baseFare.baseDistanceKm) {
+//       const extraKm =
+//         distanceKm - pricingConfig.baseFare.baseDistanceKm;
+
+//       distancePay =
+//         extraKm * pricingConfig.distanceFare.perKmRate;
+//     }
+
+//     // Surge logic
+//     const currentTime = new Date().toTimeString().slice(0, 5);
+//     const isRaining = order.weather === "RAIN";
+
+//     pricingConfig.surges.forEach(surge => {
+//       if (!surge.isActive) return;
+
+//       let apply = false;
+
+//       if (
+//         surge.type === "PEAK" &&
+//         currentTime >= surge.conditions.startTime &&
+//         currentTime <= surge.conditions.endTime
+//       ) apply = true;
+
+//       if (surge.type === "RAIN" && isRaining) apply = true;
+
+//       if (
+//         surge.type === "ZONE" &&
+//         surge.conditions.zoneIds?.includes(order.zoneId)
+//       ) apply = true;
+
+//       if (apply) {
+//         surgePay += surge.value;
+
+//         appliedSurges.push({
+//           type: surge.type,
+//           multiplierType: surge.multiplierType || "FIXED",
+//           value: surge.value
+//         });
+//       }
+//     });
+
+//     const totalEarning = basePay + distancePay + surgePay;
+
+//     /* ===============================
+//        7️⃣ SAVE SNAPSHOT INTO ORDER
+//     =============================== */
+//     order.riderEarning = {
+//       basePay,
+//       distancePay,
+//       surgePay,
+//       appliedSurges,
+//       tips: 0,
+//       totalEarning,
+//       credited: false
+//     };
+
+//     order.tracking = {
+//       distanceInKm: routeInfo.distanceKm,
+//       durationInMin: routeInfo.etaMinutes
+//     };
+
+//     await order.save();
+
+//     console.log(
+//   "Riders getting popup:",
+//   riders.map(r => r._id.toString())
+// );
+
+
+//     /* ===============================
+//        8️⃣ WEBSOCKET NOTIFICATION
+//     =============================== */
+//     riders.forEach(rider => {
+//       notifyRider(rider._id.toString(), {
+//         type: "ORDER_POPUP",
+//         orderId: order.orderId,
+//         vendorShopName: order.vendorShopName,
+//         pickupLocation: order.pickupAddress,
+//         dropLocation: order.deliveryAddress,
+//         distanceKm: routeInfo.distanceKm,
+//         etaMinutes: routeInfo.etaMinutes,
+//         estimatedEarning: totalEarning
+//       });
+//     });
+
+//     /* ===============================
+//        9️⃣ RESPONSE
+//     =============================== */
+//     return res.status(200).json({
+//       success: true,
+//       message: "Order confirmed and sent to riders",
+//       estimatedEarning: totalEarning,
+//       notifiedRiders: riders.length
+//     });
+
+//   } catch (err) {
+//     console.error("Confirm order error:", err);
+//     return res.status(500).json({
+//       success: false,
+//       message: err.message || "Failed to confirm order"
+//     });
+//   }
+// }
+
+// async function confirmOrder(req, res) {
+//   try {
+//     const { orderId } = req.params;
+//     const now = new Date();
+ 
+//     /* ===============================
+//        1️⃣ FETCH ORDER
+//     =============================== */
+//     const order = await Order.findOne({ orderId });
+ 
+//     if (!order) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Order not found"
+//       });
+//     }
+ 
+//     if (order.orderStatus !== "CREATED") {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Order already processed"
+//       });
+//     }
+ 
+//     /* ===============================
+//        2️⃣ FETCH ELIGIBLE RIDERS (READY + ONLINE + SLOT BOOKED)
+//     =============================== */
+//     const riders = await Rider.aggregate([
+//       {
+//         $match: {
+//           orderState: "READY",
+//           "riderStatus.isOnline": true
+//         }
+//       },
+//       {
+//         $lookup: {
+//           from: "slotbookings",
+//           let: { riderId: "$_id" },
+//           pipeline: [
+//             {
+//               $match: {
+//                 $expr: {
+//                   $and: [
+//                     { $eq: ["$riderId", "$$riderId"] },
+//                     { $eq: ["$status", "BOOKED"] },
+//                     { $eq: ["$city", order.city] },
+//                     { $eq: ["$zone", order.zone] },
+//                     { $lte: ["$slotStartAt", now] },
+//                     { $gte: ["$slotEndAt", now] }
+//                   ]
+//                 }
+//               }
+//             }
+//           ],
+//           as: "activeSlot"
+//         }
+//       },
+//       {
+//         $match: {
+//           "activeSlot.0": { $exists: true }
+//         }
+//       },
+//       {
+//         $project: {
+//           _id: 1
+//         }
+//       },
+//       { $limit: 10 }
+//     ]);
+ 
+//     if (!riders.length) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "No slot-booked riders available"
+//       });
+//     }
+ 
+//     /* ===============================
+//        3️⃣ UPDATE ORDER STATUS + ALLOCATION
+//     =============================== */
+//     order.orderStatus = "CONFIRMED";
+//     order.allocation = {
+//       candidateRiders: riders.map(r => ({
+//         riderId: r._id,
+//         status: "PENDING",
+//         notifiedAt: new Date()
+//       })),
+//       expiresAt: new Date(Date.now() + 120 * 1000)
+//     };
+ 
+//     await order.save();
+ 
+//     /* ===============================
+//        4️⃣ DISTANCE + ETA
+//     =============================== */
+//     const routeInfo = await getRouteInfo(
+//       order.pickupAddress,
+//       order.deliveryAddress
+//     );
+ 
+//     /* ===============================
+//        5️⃣ FETCH PRICING CONFIG
+//     =============================== */
+//     const pricingConfig = await PricingConfig.findOne({ isActive: true });
+//     if (!pricingConfig) {
+//       throw new Error("Pricing config not found");
+//     }
+ 
+//     /* ===============================
+//        6️⃣ RIDER EARNING CALCULATION
+//     =============================== */
+//     let basePay = pricingConfig.baseFare.baseAmount;
+//     let distancePay = 0;
+//     let surgePay = 0;
+//     let appliedSurges = [];
+ 
+//     const distanceKm = routeInfo.distanceKm;
+ 
+//     if (distanceKm > pricingConfig.baseFare.baseDistanceKm) {
+//       const extraKm =
+//         distanceKm - pricingConfig.baseFare.baseDistanceKm;
+ 
+//       distancePay =
+//         extraKm * pricingConfig.distanceFare.perKmRate;
+//     }
+ 
+//     const currentTime = new Date().toTimeString().slice(0, 5);
+//     const isRaining = order.weather === "RAIN";
+ 
+//     pricingConfig.surges.forEach(surge => {
+//       if (!surge.isActive) return;
+ 
+//       let apply = false;
+ 
+//       if (
+//         surge.type === "PEAK" &&
+//         currentTime >= surge.conditions.startTime &&
+//         currentTime <= surge.conditions.endTime
+//       ) apply = true;
+ 
+//       if (surge.type === "RAIN" && isRaining) apply = true;
+ 
+//       if (
+//         surge.type === "ZONE" &&
+//         surge.conditions.zoneIds?.includes(order.zoneId)
+//       ) apply = true;
+ 
+//       if (apply) {
+//         surgePay += surge.value;
+//         appliedSurges.push({
+//           type: surge.type,
+//           multiplierType: surge.multiplierType || "FIXED",
+//           value: surge.value
+//         });
+//       }
+//     });
+ 
+//     const totalEarning = basePay + distancePay + surgePay;
+ 
+//     /* ===============================
+//        7️⃣ SAVE SNAPSHOT INTO ORDER
+//     =============================== */
+//     order.riderEarning = {
+//       basePay,
+//       distancePay,
+//       surgePay,
+//       appliedSurges,
+//       tips: 0,
+//       totalEarning,
+//       credited: false
+//     };
+ 
+//     order.tracking = {
+//       distanceInKm: routeInfo.distanceKm,
+//       durationInMin: routeInfo.etaMinutes
+//     };
+ 
+//     await order.save();
+ 
+//     console.log(
+//       "Riders getting popup:",
+//       riders.map(r => r._id.toString())
+//     );
+ 
+//     /* ===============================
+//        8️⃣ WEBSOCKET NOTIFICATION
+//     =============================== */
+//     riders.forEach(rider => {
+//       notifyRider(rider._id.toString(), {
+//         type: "ORDER_POPUP",
+//         orderId: order.orderId,
+//         vendorShopName: order.vendorShopName,
+//         pickupLocation: order.pickupAddress,
+//         dropLocation: order.deliveryAddress,
+//         distanceKm: routeInfo.distanceKm,
+//         etaMinutes: routeInfo.etaMinutes,
+//         estimatedEarning: totalEarning
+//       });
+//     });
+ 
+//     /* ===============================
+//        9️⃣ RESPONSE
+//     =============================== */
+//     return res.status(200).json({
+//       success: true,
+//       message: "Order confirmed and sent to slot-booked riders",
+//       estimatedEarning: totalEarning,
+//       notifiedRiders: riders.length
+//     });
+ 
+//   } catch (err) {
+//     console.error("Confirm order error:", err);
+//     return res.status(500).json({
+//       success: false,
+//       message: err.message || "Failed to confirm order"
+//     });
+//   }
+// }
+
+async function getRouteInfo(pickupAddress, deliveryAddress) {
+  if (!pickupAddress || !deliveryAddress) {
+    throw new Error("Pickup or Delivery address missing");
+  }
+
+  const pickupCoords = pickupAddress.location?.coordinates;
+  const dropCoords = deliveryAddress.location?.coordinates;
+
+  if (
+    !Array.isArray(pickupCoords) || pickupCoords.length !== 2 ||
+    !Array.isArray(dropCoords) || dropCoords.length !== 2
+  ) {
+    throw new Error("Invalid pickup/delivery coordinates");
+  }
+
+  const [pickupLng, pickupLat] = pickupCoords;
+  const [dropLng, dropLat] = dropCoords;
+
+  const response = await axios.get(
+    "https://maps.googleapis.com/maps/api/directions/json",
+    {
+      params: {
+        origin: `${pickupLat},${pickupLng}`,
+        destination: `${dropLat},${dropLng}`,
+        key: process.env.GOOGLE_KEY
+      }
+    }
+  );
+
+  if (!response.data.routes || response.data.routes.length === 0) {
+    throw new Error("No route found between pickup and drop");
+  }
+
+  const leg = response.data.routes[0].legs[0];
+
+  return {
+    distanceKm: Number((leg.distance.value / 1000).toFixed(2)),
+    etaMinutes: Math.ceil(leg.duration.value / 60)
+  };
+}
+
 async function confirmOrder(req, res) {
+
   try {
+
     const { orderId } = req.params;
+
+    const now = new Date();
 
     /* ===============================
        1️⃣ FETCH ORDER
     =============================== */
+
     const order = await Order.findOne({ orderId });
 
     if (!order) {
@@ -767,8 +1185,9 @@ async function confirmOrder(req, res) {
       });
     }
 
+
     /* ===============================
-       2️⃣ FETCH ELIGIBLE RIDERS
+       2️⃣ GET WEEKLY SLOT
     =============================== */
     // const riders = await Rider.find({
     //   // "deliveryStatus.isActive": true,
@@ -777,12 +1196,13 @@ async function confirmOrder(req, res) {
     // })
     //   .limit(10)
     //   .select("_id");
-     const now = new Date();
+    //  const now = new Date();
 
 const riders = await Rider.aggregate([
   {
     $match: {
       orderState: "READY",
+
       "riderStatus.isOnline": true
     }
   },
@@ -825,65 +1245,88 @@ const riders = await Rider.aggregate([
     if (!riders.length) {
       return res.status(400).json({
         success: false,
-        message: "No riders available"
+        message: "No eligible riders available"
       });
     }
 
+
     /* ===============================
-       3️⃣ UPDATE ORDER STATUS + ALLOCATION
+       6️⃣ UPDATE ORDER STATUS
     =============================== */
+
     order.orderStatus = "CONFIRMED";
+
     order.allocation = {
+
       candidateRiders: riders.map(r => ({
         riderId: r._id,
         status: "PENDING",
-        notifiedAt: new Date()
+        notifiedAt: now
       })),
-      expiresAt: new Date(Date.now() + 120 * 1000)
+
+      expiresAt: new Date(Date.now() + 120000)
+
     };
 
-    await order.save();
 
     /* ===============================
-       4️⃣ DISTANCE + ETA
+       7️⃣ ROUTE INFO
     =============================== */
+
     const routeInfo = await getRouteInfo(
       order.pickupAddress,
       order.deliveryAddress
     );
 
+
     /* ===============================
-       5️⃣ FETCH PRICING CONFIG
+       8️⃣ PRICING CONFIG
     =============================== */
-    const pricingConfig = await PricingConfig.findOne({ isActive: true });
+
+    const pricingConfig =
+      await PricingConfig.findOne({ isActive: true });
+
     if (!pricingConfig) {
       throw new Error("Pricing config not found");
     }
 
+
     /* ===============================
-       6️⃣ RIDER EARNING CALCULATION
+       9️⃣ EARNING CALCULATION
     =============================== */
-    let basePay = pricingConfig.baseFare.baseAmount;
+
+    let basePay =
+      pricingConfig.baseFare.baseAmount;
+
     let distancePay = 0;
+
     let surgePay = 0;
+
     let appliedSurges = [];
 
     const distanceKm = routeInfo.distanceKm;
 
-    // Distance pay
     if (distanceKm > pricingConfig.baseFare.baseDistanceKm) {
+
       const extraKm =
-        distanceKm - pricingConfig.baseFare.baseDistanceKm;
+        distanceKm -
+        pricingConfig.baseFare.baseDistanceKm;
 
       distancePay =
-        extraKm * pricingConfig.distanceFare.perKmRate;
+        extraKm *
+        pricingConfig.distanceFare.perKmRate;
     }
 
-    // Surge logic
-    const currentTime = new Date().toTimeString().slice(0, 5);
-    const isRaining = order.weather === "RAIN";
+
+    const currentTime =
+      now.toTimeString().slice(0, 5);
+
+    const isRaining =
+      order.weather === "RAIN";
+
 
     pricingConfig.surges.forEach(surge => {
+
       if (!surge.isActive) return;
 
       let apply = false;
@@ -894,7 +1337,10 @@ const riders = await Rider.aggregate([
         currentTime <= surge.conditions.endTime
       ) apply = true;
 
-      if (surge.type === "RAIN" && isRaining) apply = true;
+      if (
+        surge.type === "RAIN" &&
+        isRaining
+      ) apply = true;
 
       if (
         surge.type === "ZONE" &&
@@ -902,81 +1348,122 @@ const riders = await Rider.aggregate([
       ) apply = true;
 
       if (apply) {
+
         surgePay += surge.value;
 
         appliedSurges.push({
           type: surge.type,
-          multiplierType: surge.multiplierType || "FIXED",
+          multiplierType:
+            surge.multiplierType || "FIXED",
           value: surge.value
         });
+
       }
+
     });
 
-    const totalEarning = basePay + distancePay + surgePay;
+
+    const totalEarning =
+      basePay + distancePay + surgePay;
+
 
     /* ===============================
-       7️⃣ SAVE SNAPSHOT INTO ORDER
+       🔟 SAVE ORDER
     =============================== */
+
     order.riderEarning = {
+
       basePay,
+
       distancePay,
+
       surgePay,
+
       appliedSurges,
+
       tips: 0,
+
       totalEarning,
+
       credited: false
+
     };
 
+
     order.tracking = {
+
       distanceInKm: routeInfo.distanceKm,
+
       durationInMin: routeInfo.etaMinutes
+
     };
+
 
     await order.save();
 
+
+    /* ===============================
+       1️⃣1️⃣ SEND POPUP
+    =============================== */
+
     console.log(
-  "Riders getting popup:",
-  riders.map(r => r._id.toString())
-);
+      "Notifying riders:",
+      riders.map(r => r._id.toString())
+    );
 
 
-    /* ===============================
-       8️⃣ WEBSOCKET NOTIFICATION
-    =============================== */
     riders.forEach(rider => {
-      notifyRider(rider._id.toString(), {
-        type: "ORDER_POPUP",
-        orderId: order.orderId,
-        vendorShopName: order.vendorShopName,
-        pickupLocation: order.pickupAddress,
-        dropLocation: order.deliveryAddress,
-        distanceKm: routeInfo.distanceKm,
-        etaMinutes: routeInfo.etaMinutes,
-        estimatedEarning: totalEarning
-      });
+
+      notifyRider(
+        rider._id.toString(),
+        {
+          type: "ORDER_POPUP",
+          orderId: order.orderId,
+          vendorShopName: order.vendorShopName,
+          pickupLocation: order.pickupAddress,
+          dropLocation: order.deliveryAddress,
+          distanceKm: routeInfo.distanceKm,
+          etaMinutes: routeInfo.etaMinutes,
+          estimatedEarning: totalEarning
+        }
+      );
+
     });
 
+
     /* ===============================
-       9️⃣ RESPONSE
+       1️⃣2️⃣ RESPONSE
     =============================== */
+
     return res.status(200).json({
+
       success: true,
-      message: "Order confirmed and sent to riders",
-      estimatedEarning: totalEarning,
-      notifiedRiders: riders.length
+
+      message:
+        "Order confirmed and sent to slot-booked riders",
+
+      notifiedRiders: riders.length,
+
+      estimatedEarning: totalEarning
+
     });
+
 
   } catch (err) {
+
     console.error("Confirm order error:", err);
+
     return res.status(500).json({
       success: false,
-      message: err.message || "Failed to confirm order"
+      message:
+        err.message ||
+        "Failed to confirm order"
     });
+
   }
+
 }
 
-
- 
 
 
 
@@ -1111,10 +1598,428 @@ const riders = await Rider.aggregate([
 
 
  
+// async function acceptOrder(req, res) {
+
+//   const session = await mongoose.startSession();
+ 
+//   try {
+
+//     const { orderId } = req.params;
+
+//     const riderId = req.rider._id;
+
+//     const now = new Date();
+ 
+//     // 🚫 Rider already busy
+
+//     if (req.rider.orderState === "BUSY") {
+
+//       return res.status(409).json({
+
+//         success: false,
+
+//         message: "Rider already busy"
+
+//       });
+
+//     }
+ 
+//     session.startTransaction();
+ 
+//     /* ============================
+
+//        1️⃣ ASSIGN ORDER
+
+//     ============================ */
+
+//     const order = await Order.findOneAndUpdate(
+
+//       {
+
+//         orderId,
+
+//         orderStatus: "CONFIRMED",
+
+//         riderId: null,
+
+//         "allocation.expiresAt": { $gt: now },
+
+//         "allocation.candidateRiders": {
+
+//           $elemMatch: {
+
+//             riderId,
+
+//             status: "PENDING"
+
+//           }
+
+//         }
+
+//       },
+
+//       {
+
+//         $set: {
+
+//           riderId,
+
+//           orderStatus: "ASSIGNED",
+
+//           "allocation.assignedAt": now,
+
+//           "allocation.candidateRiders.$[r].status": "ACCEPTED"
+
+//         }
+
+//       },
+
+//       {
+
+//         new: true,
+
+//         session,
+
+//         arrayFilters: [{ "r.riderId": riderId }]
+
+//       }
+
+//     );
+ 
+//     if (!order) {
+
+//       await session.abortTransaction();
+
+//       return res.status(409).json({
+
+//         success: false,
+
+//         message: "Order already assigned or expired"
+
+//       });
+
+//     }
+ 
+//     /* ============================
+
+//        2️⃣ MARK OTHER RIDERS REJECTED
+
+//     ============================ */
+
+//     await Order.updateOne(
+
+//       { orderId },
+
+//       {
+
+//         $set: {
+
+//           "allocation.candidateRiders.$[r].status": "REJECTED"
+
+//         }
+
+//       },
+
+//       {
+
+//         session,
+
+//         arrayFilters: [
+
+//           { "r.riderId": { $ne: riderId }, "r.status": "PENDING" }
+
+//         ]
+
+//       }
+
+//     );
+ 
+//     /* ============================
+
+//        3️⃣ UPDATE RIDER → BUSY
+
+//     ============================ */
+
+//     await Rider.updateOne(
+
+//       {
+
+//         _id: riderId,
+
+//         orderState: "READY" // 🔒 safety check
+
+//       },
+
+//       {
+
+//         $set: {
+
+//           orderState: "BUSY",
+
+//           currentOrderId: order._id
+
+//         }
+
+//       },
+
+//       { session }
+
+//     );
+ 
+//     await session.commitTransaction();
+ 
+//     return res.json({
+
+//       success: true,
+
+//       message: "Order accepted, rider is now busy",
+
+//       orderId: order.orderId,
+//       orderStatus:order.orderStatus
+
+//     });
+ 
+//   } catch (err) {
+
+//     await session.abortTransaction();
+
+//     console.error("Accept order error:", err);
+ 
+//     return res.status(500).json({
+
+//       success: false,
+
+//       message: "Failed to accept order"
+
+//     });
+
+//   } finally {
+
+//     session.endSession();
+
+//   }
+
+// }
+
+
+function getWeekYear(date = new Date()) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+
+  const weekNumber = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+
+  return {
+    weekNumber,
+    year: d.getUTCFullYear()
+  };
+}
+
+
+// async function acceptOrder(req, res) {
+
+//   const session = await mongoose.startSession();
+
+//   try {
+
+//     const { orderId } = req.params;
+
+//     const riderId = req.rider._id;
+
+//     const now = new Date();
+
+//     // 🚫 Rider already busy
+//     if (req.rider.orderState === "BUSY") {
+//       return res.status(409).json({
+//         success: false,
+//         message: "Rider already busy"
+//       });
+//     }
+
+//     session.startTransaction();
+
+//     /* ============================
+//        0️⃣ FIND CURRENT SLOT
+//     ============================ */
+
+//     const { weekNumber, year } = getWeekYear(now);
+
+//     const weeklySlot = await WeeklySlot.findOne(
+//       {
+//         weekNumber,
+//         year,
+//         city: req.rider.city,
+//         zone: req.rider.zone,
+//         isDeleted: false,
+//         "slots.slotStartAt": { $lte: now },
+//         "slots.slotEndAt": { $gte: now },
+//         "slots.riders": {
+//           $elemMatch: {
+//             riderId,
+//             status: "BOOKED"
+//           }
+//         }
+//       },
+//       {
+//         slots: {
+//           $elemMatch: {
+//             slotStartAt: { $lte: now },
+//             slotEndAt: { $gte: now },
+//             riders: {
+//               $elemMatch: {
+//                 riderId,
+//                 status: "BOOKED"
+//               }
+//             }
+//           }
+//         }
+//       }
+//     ).session(session);
+
+//     let slotInfo = {
+//       isSlotBooked: false
+//     };
+
+//     if (weeklySlot && weeklySlot.slots.length > 0) {
+
+//       const slot = weeklySlot.slots[0];
+
+//       slotInfo = {
+//         slotId: slot.slotId,
+//         isSlotBooked: true,
+//         isPeakSlot: slot.isPeakSlot,
+//         slotStartAt: slot.slotStartAt,
+//         slotEndAt: slot.slotEndAt
+//       };
+
+//     }
+
+ 
+
+
+
+
+//     /* ============================
+//        1️⃣ ASSIGN ORDER + SAVE SLOT INFO
+//     ============================ */
+
+//     const order = await Order.findOneAndUpdate(
+//       {
+//         orderId,
+//         orderStatus: "CONFIRMED",
+//         riderId: null,
+//         "allocation.expiresAt": { $gt: now },
+//         "allocation.candidateRiders": {
+//           $elemMatch: {
+//             riderId,
+//             status: "PENDING"
+//           }
+//         }
+//       },
+//       {
+//         $set: {
+//           riderId,
+//           orderStatus: "ASSIGNED",
+//           "allocation.assignedAt": now,
+//           "allocation.candidateRiders.$[r].status": "ACCEPTED",
+
+//           // ✅ SAVE SLOT INFO HERE
+//           slotInfo: slotInfo
+//         }
+//       },
+//       {
+//         new: true,
+//         session,
+//         arrayFilters: [{ "r.riderId": riderId }]
+//       }
+//     );
+
+//     if (!order) {
+
+//       await session.abortTransaction();
+
+//       return res.status(409).json({
+//         success: false,
+//         message: "Order already assigned or expired"
+//       });
+
+//     }
+
+//     /* ============================
+//        2️⃣ MARK OTHER RIDERS REJECTED
+//     ============================ */
+
+//     await Order.updateOne(
+//       { orderId },
+//       {
+//         $set: {
+//           "allocation.candidateRiders.$[r].status": "REJECTED"
+//         }
+//       },
+//       {
+//         session,
+//         arrayFilters: [
+//           { "r.riderId": { $ne: riderId }, "r.status": "PENDING" }
+//         ]
+//       }
+//     );
+
+//     /* ============================
+//        3️⃣ UPDATE RIDER → BUSY
+//     ============================ */
+
+//     await Rider.updateOne(
+//       {
+//         _id: riderId,
+//         orderState: "READY"
+//       },
+//       {
+//         $set: {
+//           orderState: "BUSY",
+//           currentOrderId: order._id
+//         }
+//       },
+//       { session }
+//     );
+
+//     await session.commitTransaction();
+
+//     return res.json({
+//       success: true,
+//       message: "Order accepted, rider is now busy",
+//       orderId: order.orderId,
+//       orderStatus: order.orderStatus,
+//       slotInfo: order.slotInfo
+//     });
+
+//   }
+//   catch (err) {
+
+//     await session.abortTransaction();
+
+//     console.error("Accept order error:", err);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to accept order"
+//     });
+
+//   }
+//   finally {
+
+//     session.endSession();
+
+//   }
+
+// }
+
 async function acceptOrder(req, res) {
 
   const session = await mongoose.startSession();
- 
+
   try {
 
     const { orderId } = req.params;
@@ -1122,197 +2027,166 @@ async function acceptOrder(req, res) {
     const riderId = req.rider._id;
 
     const now = new Date();
- 
-    // 🚫 Rider already busy
 
+    // 🚫 Rider already busy
     if (req.rider.orderState === "BUSY") {
 
       return res.status(409).json({
-
         success: false,
-
         message: "Rider already busy"
-
       });
 
     }
- 
+
     session.startTransaction();
- 
+
     /* ============================
+       0️⃣ FIND CURRENT SLOT FROM SLOTBOOKINGS
+    ============================ */
 
-       1️⃣ ASSIGN ORDER
+    const SlotBooking = mongoose.model("SlotBooking");
 
+    const slotBooking = await SlotBooking.findOne(
+      {
+        riderId: riderId,
+        status: "BOOKED",
+        slotStartAt: { $lte: now },
+        slotEndAt: { $gte: now }
+      }
+    )
+    .select("_id slotId slotStartAt slotEndAt isPeakSlot")
+    .session(session);
+
+    let slotInfo = {
+      isSlotBooked: false
+    };
+
+    if (slotBooking) {
+
+      slotInfo = {
+        slotBookingId: slotBooking._id,
+        slotId: slotBooking.slotId,
+        isSlotBooked: true,
+        isPeakSlot: slotBooking.isPeakSlot || false,
+        slotStartAt: slotBooking.slotStartAt,
+        slotEndAt: slotBooking.slotEndAt
+      };
+
+    }
+
+    /* ============================
+       1️⃣ ASSIGN ORDER + SAVE SLOT INFO
     ============================ */
 
     const order = await Order.findOneAndUpdate(
-
       {
-
         orderId,
-
         orderStatus: "CONFIRMED",
-
         riderId: null,
-
         "allocation.expiresAt": { $gt: now },
-
         "allocation.candidateRiders": {
-
           $elemMatch: {
-
             riderId,
-
             status: "PENDING"
-
           }
-
         }
-
       },
-
       {
-
         $set: {
-
           riderId,
-
           orderStatus: "ASSIGNED",
-
           "allocation.assignedAt": now,
-
-          "allocation.candidateRiders.$[r].status": "ACCEPTED"
-
+          "allocation.candidateRiders.$[r].status": "ACCEPTED",
+          slotInfo: slotInfo
         }
-
       },
-
       {
-
         new: true,
-
         session,
-
         arrayFilters: [{ "r.riderId": riderId }]
-
       }
-
     );
- 
+
     if (!order) {
 
       await session.abortTransaction();
 
       return res.status(409).json({
-
         success: false,
-
         message: "Order already assigned or expired"
-
       });
 
     }
- 
+
     /* ============================
-
        2️⃣ MARK OTHER RIDERS REJECTED
-
     ============================ */
 
     await Order.updateOne(
-
       { orderId },
-
       {
-
         $set: {
-
           "allocation.candidateRiders.$[r].status": "REJECTED"
-
         }
-
       },
-
       {
-
         session,
-
         arrayFilters: [
-
           { "r.riderId": { $ne: riderId }, "r.status": "PENDING" }
-
         ]
-
       }
-
     );
- 
+
     /* ============================
-
        3️⃣ UPDATE RIDER → BUSY
-
     ============================ */
 
     await Rider.updateOne(
-
       {
-
         _id: riderId,
-
-        orderState: "READY" // 🔒 safety check
-
+        orderState: "READY"
       },
-
       {
-
         $set: {
-
           orderState: "BUSY",
-
           currentOrderId: order._id
-
         }
-
       },
-
       { session }
-
     );
- 
+
     await session.commitTransaction();
- 
+
     return res.json({
-
       success: true,
-
       message: "Order accepted, rider is now busy",
-
       orderId: order.orderId,
-      orderStatus:order.orderStatus
-
+      orderStatus: order.orderStatus,
+      slotInfo: order.slotInfo
     });
- 
-  } catch (err) {
+
+  }
+  catch (err) {
 
     await session.abortTransaction();
 
     console.error("Accept order error:", err);
- 
+
     return res.status(500).json({
-
       success: false,
-
       message: "Failed to accept order"
-
     });
 
-  } finally {
+  }
+  finally {
 
     session.endSession();
 
   }
 
 }
+
+
 
  
 
@@ -1999,8 +2873,164 @@ async function deliverOrder(req, res) {
 
 =============================== */
  
+// /* ===============================
+//    8️⃣ INCENTIVE PROGRESS UPDATE
+// =============================== */
+
+// const incentives = await Incentive.find({ status: "ACTIVE" });
+
+// const dateKey = getDateKey();
+// const weekKey = getWeekKey();
+
+// /* 🔥 SLOT BASED PEAK DETECTION */
+// let slot = null;
+// let isPeak = false;
+
+// if (order.slotId) {
+//   slot = await Slot.findById(order.slotId);
+//   if (slot && slot.isPeakSlot) {
+//     isPeak = true;
+//   }
+// }
+
+// for (const incentive of incentives) {
+
+//   /* ===============================
+//      🔥 PEAK SLOT INCENTIVE
+//   =============================== */
+//   if (incentive.incentiveType === "PEAK_SLOT" && isPeak) {
+
+//     const progress = await RiderIncentiveProgress.findOneAndUpdate(
+//       {
+//         riderId,
+//         incentiveId: incentive._id,
+//         date: dateKey
+//       },
+//       {
+//         $inc: {
+//           totalOrders: 1,
+//           peakOrders: 1
+//         },
+//         $setOnInsert: {
+//           incentiveType: "PEAK",
+//           slotInfo: {
+//             slotStart: slot.startTime,
+//             slotEnd: slot.endTime
+//           }
+//         }
+//       },
+//       { upsert: true, new: true }
+//     );
+
+//     const slab = incentive.slabs?.find(s =>
+//       progress.peakOrders >= s.minOrders &&
+//       progress.peakOrders <= s.maxOrders
+//     );
+
+//     if (slab) {
+//       progress.eligible = true;
+//       progress.achievedReward = slab.rewardAmount;
+//       await progress.save();
+//     }
+//   }
+
+//   /* ===============================
+//      🔥 DAILY TARGET INCENTIVE
+//   =============================== */
+//   if (incentive.incentiveType === "DAILY_TARGET") {
+
+//     const progress = await RiderIncentiveProgress.findOneAndUpdate(
+//       {
+//         riderId,
+//         incentiveId: incentive._id,
+//         date: dateKey
+//       },
+//       {
+//         $inc: {
+//           totalOrders: 1,
+//           peakOrders: isPeak ? 1 : 0,
+//           normalOrders: isPeak ? 0 : 1
+//         },
+//         $setOnInsert: {
+//           incentiveType: "DAILY_TARGET"
+//         }
+//       },
+//       { upsert: true, new: true }
+//     );
+
+//     if (
+//       progress.totalOrders >= incentive.minOrders &&
+//       progress.peakOrders >= incentive.slotRules.minPeakSlots
+//     ) {
+//       progress.eligible = true;
+//       progress.achievedReward = incentive.rewardAmount;
+//       await progress.save();
+//     }
+//   }
+
+//   /* ===============================
+//      🔥 WEEKLY TARGET INCENTIVE  ← FIXED
+//   =============================== */
+
+//   if (incentive.incentiveType === "WEEKLY_TARGET") {
+
+//     const progress = await RiderIncentiveProgress.findOneAndUpdate(
+//       {
+//         riderId,
+//         incentiveId: incentive._id,
+//         week: weekKey
+//       },
+//       {
+//         $setOnInsert: {
+//           incentiveType: "WEEKLY_TARGET",
+//           weeklyProgress: {
+//             eligibleDays: 0,
+//             dailyOrderMap: {}
+//           }
+//         }
+//       },
+//       { upsert: true, new: true }
+//     );
+
+//     /* ====== 🔥 FIX START ====== */
+
+//     if (!progress.weeklyProgress) {
+//       progress.weeklyProgress = {
+//         eligibleDays: 0,
+//         dailyOrderMap: {}
+//       };
+//     }
+
+//     if (!progress.weeklyProgress.dailyOrderMap) {
+//       progress.weeklyProgress.dailyOrderMap = {};
+//     }
+
+//     const map = progress.weeklyProgress.dailyOrderMap;
+
+//     const todayCount = map[dateKey] || 0;
+
+//     map[dateKey] = todayCount + 1;
+
+//     if (todayCount + 1 === incentive.weeklyRules.minOrdersPerDay) {
+//       progress.weeklyProgress.eligibleDays += 1;
+//     }
+
+//     if (
+//       progress.weeklyProgress.eligibleDays >=
+//       incentive.weeklyRules.totalDaysInWeek
+//     ) {
+//       progress.eligible = true;
+//       progress.achievedReward = incentive.maxRewardPerWeek;
+//     }
+
+//     await progress.save();
+
+//     /* ====== 🔥 FIX END ====== */
+//   }
+// }
+
 /* ===============================
-   8️⃣ INCENTIVE PROGRESS UPDATE
+   8️⃣ INCENTIVE PROGRESS UPDATE (FINAL FIX)
 =============================== */
 
 const incentives = await Incentive.find({ status: "ACTIVE" });
@@ -2008,23 +3038,18 @@ const incentives = await Incentive.find({ status: "ACTIVE" });
 const dateKey = getDateKey();
 const weekKey = getWeekKey();
 
-/* 🔥 SLOT BASED PEAK DETECTION */
-let slot = null;
-let isPeak = false;
-
-if (order.slotId) {
-  slot = await Slot.findById(order.slotId);
-  if (slot && slot.isPeakSlot) {
-    isPeak = true;
-  }
-}
+/* SLOT INFO FROM ORDER */
+const isPeak = order.slotInfo?.isSlotBooked && order.slotInfo?.isPeakSlot;
 
 for (const incentive of incentives) {
 
   /* ===============================
-     🔥 PEAK SLOT INCENTIVE
+     PEAK SLOT INCENTIVE
   =============================== */
-  if (incentive.incentiveType === "PEAK_SLOT" && isPeak) {
+
+  if (incentive.incentiveType === "PEAK_SLOT") {
+
+    if (!isPeak) continue;
 
     const progress = await RiderIncentiveProgress.findOneAndUpdate(
       {
@@ -2038,14 +3063,20 @@ for (const incentive of incentives) {
           peakOrders: 1
         },
         $setOnInsert: {
-          incentiveType: "PEAK",
+          incentiveType: "PEAK_SLOT",
+          eligible: false,
+          achievedReward: 0,
+          status: "IN_PROGRESS",
           slotInfo: {
-            slotStart: slot.startTime,
-            slotEnd: slot.endTime
+            slotStart: order.slotInfo.slotStartAt,
+            slotEnd: order.slotInfo.slotEndAt
           }
         }
       },
-      { upsert: true, new: true }
+      {
+        upsert: true,
+        new: true
+      }
     );
 
     const slab = incentive.slabs?.find(s =>
@@ -2054,15 +3085,21 @@ for (const incentive of incentives) {
     );
 
     if (slab) {
+
       progress.eligible = true;
       progress.achievedReward = slab.rewardAmount;
+      progress.status = "ACHIEVED";
+
       await progress.save();
+
     }
+
   }
 
   /* ===============================
-     🔥 DAILY TARGET INCENTIVE
+     DAILY TARGET INCENTIVE
   =============================== */
+
   if (incentive.incentiveType === "DAILY_TARGET") {
 
     const progress = await RiderIncentiveProgress.findOneAndUpdate(
@@ -2078,24 +3115,35 @@ for (const incentive of incentives) {
           normalOrders: isPeak ? 0 : 1
         },
         $setOnInsert: {
-          incentiveType: "DAILY_TARGET"
+          incentiveType: "DAILY_TARGET",
+          eligible: false,
+          achievedReward: 0,
+          status: "IN_PROGRESS"
         }
       },
-      { upsert: true, new: true }
+      {
+        upsert: true,
+        new: true
+      }
     );
 
     if (
       progress.totalOrders >= incentive.minOrders &&
       progress.peakOrders >= incentive.slotRules.minPeakSlots
     ) {
+
       progress.eligible = true;
       progress.achievedReward = incentive.rewardAmount;
+      progress.status = "ACHIEVED";
+
       await progress.save();
+
     }
+
   }
 
   /* ===============================
-     🔥 WEEKLY TARGET INCENTIVE  ← FIXED
+     WEEKLY TARGET INCENTIVE
   =============================== */
 
   if (incentive.incentiveType === "WEEKLY_TARGET") {
@@ -2109,51 +3157,52 @@ for (const incentive of incentives) {
       {
         $setOnInsert: {
           incentiveType: "WEEKLY_TARGET",
+          eligible: false,
+          achievedReward: 0,
+          status: "IN_PROGRESS",
           weeklyProgress: {
             eligibleDays: 0,
             dailyOrderMap: {}
           }
         }
       },
-      { upsert: true, new: true }
+      {
+        upsert: true,
+        new: true
+      }
     );
 
-    /* ====== 🔥 FIX START ====== */
-
-    if (!progress.weeklyProgress) {
-      progress.weeklyProgress = {
-        eligibleDays: 0,
-        dailyOrderMap: {}
-      };
-    }
-
-    if (!progress.weeklyProgress.dailyOrderMap) {
-      progress.weeklyProgress.dailyOrderMap = {};
-    }
+    if (!progress.weeklyProgress)
+      progress.weeklyProgress = { eligibleDays: 0, dailyOrderMap: {} };
 
     const map = progress.weeklyProgress.dailyOrderMap;
 
-    const todayCount = map[dateKey] || 0;
+    const todayCount = map.get?.(dateKey) || map[dateKey] || 0;
 
-    map[dateKey] = todayCount + 1;
+    map.set
+      ? map.set(dateKey, todayCount + 1)
+      : map[dateKey] = todayCount + 1;
 
-    if (todayCount + 1 === incentive.weeklyRules.minOrdersPerDay) {
+    if (todayCount + 1 === incentive.weeklyRules.minOrdersPerDay)
       progress.weeklyProgress.eligibleDays += 1;
-    }
 
     if (
       progress.weeklyProgress.eligibleDays >=
       incentive.weeklyRules.totalDaysInWeek
     ) {
+
       progress.eligible = true;
       progress.achievedReward = incentive.maxRewardPerWeek;
+      progress.status = "ACHIEVED";
+
     }
 
     await progress.save();
 
-    /* ====== 🔥 FIX END ====== */
   }
+
 }
+
 
 
  
@@ -2636,13 +3685,174 @@ async function getCancelledOrdersByRider(req, res) {
   }
 }
 
- 
+
+async function isRiderBookedNow(req, res) {
+
+  try {
+
+    const riderId = req.rider._id; // from auth middleware
+
+    const now = new Date();
+
+    const date = now.toISOString().split("T")[0]; // YYYY-MM-DD
+
+    // Step 1: get today's slot document
+    const weeklySlot = await WeeklySlot.findOne({ date });
+
+    if (!weeklySlot) {
+      return res.status(404).json({
+        success: false,
+        message: "No slots found for today"
+      });
+    }
+
+    // Step 2: calculate current time in minutes
+    const currentMinutes =
+      now.getHours() * 60 + now.getMinutes();
+
+    // Step 3: find current slot
+    const currentSlot = weeklySlot.slots.find(slot => {
+
+      const [startHour, startMin] = slot.startTime.split(":").map(Number);
+      const [endHour, endMin] = slot.endTime.split(":").map(Number);
+
+      const startTotal = startHour * 60 + startMin;
+      const endTotal = endHour * 60 + endMin;
+
+      return currentMinutes >= startTotal && currentMinutes < endTotal;
+    });
+
+    if (!currentSlot) {
+      return res.status(200).json({
+        success: true,
+        isBooked: false,
+        message: "No active slot currently"
+      });
+    }
+
+    // Step 4: check rider inside current slot
+    const isBooked = currentSlot.riders.some(rider =>
+      rider.riderId.toString() === riderId.toString() &&
+      rider.status === "BOOKED"
+    );
+
+    return res.status(200).json({
+      success: true,
+      isBooked,
+      currentSlot: {
+        startTime: currentSlot.startTime,
+        endTime: currentSlot.endTime
+      }
+    });
+
+  } catch (error) {
+
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
+
+  }
+
+}
+
+async function getAvailableRiders(req, res) {
+
+  try {
+
+    const now = new Date();
+    const date = now.toISOString().split("T")[0];
+
+    // Step 1: get today's weekly slot
+    const weeklySlot = await WeeklySlot.findOne({ date });
+
+    if (!weeklySlot) {
+      return res.status(200).json({
+        success: true,
+        riders: [],
+        message: "No slots found for today"
+      });
+    }
+
+    // Step 2: calculate current time in minutes
+    const currentMinutes =
+      now.getHours() * 60 + now.getMinutes();
+
+    // Step 3: find current slot
+    const currentSlot = weeklySlot.slots.find(slot => {
+
+      const [startHour, startMin] = slot.startTime.split(":").map(Number);
+      const [endHour, endMin] = slot.endTime.split(":").map(Number);
+
+      const startTotal = startHour * 60 + startMin;
+      const endTotal = endHour * 60 + endMin;
+
+      return currentMinutes >= startTotal && currentMinutes < endTotal;
+    });
+
+    if (!currentSlot) {
+      return res.status(200).json({
+        success: true,
+        riders: [],
+        message: "No active slot currently"
+      });
+    }
+
+    // Step 4: get booked riderIds in current slot
+    const bookedRiderIds = currentSlot.riders
+      .filter(r => r.status === "BOOKED")
+      .map(r => r.riderId);
+
+    if (bookedRiderIds.length === 0) {
+      return res.status(200).json({
+        success: true,
+        riders: [],
+        message: "No riders booked in current slot"
+      });
+    }
+
+    // Step 5: find riders who are online + READY + booked
+    const riders = await Rider.find({
+
+      _id: { $in: bookedRiderIds },
+
+      orderState: "READY",
+
+      "riderStatus.isOnline": true
+
+    })
+      .limit(10)
+      .select("_id name phone riderStatus orderState");
+
+    return res.status(200).json({
+      success: true,
+      count: riders.length,
+      riders
+    });
+
+  } catch (error) {
+
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
+
+  }
+
+}
+
 
  
 
  
+
  
  
-module.exports = { createOrder,confirmOrder,acceptOrder,rejectOrder,getOrderDetails,pickupOrder,deliverOrder, cancelOrder,getOrdersByRider,getDeliveredOrdersByRider,getCancelledOrdersByRider};
+ 
+module.exports = { createOrder,confirmOrder,acceptOrder,rejectOrder,getOrderDetails,pickupOrder,deliverOrder, cancelOrder,getOrdersByRider,getDeliveredOrdersByRider,getCancelledOrdersByRider,isRiderBookedNow,getAvailableRiders};
  
  

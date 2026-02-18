@@ -126,28 +126,27 @@
  
 //     // 🔹 Slot snapshot
 
-//     slotInfo: {
+    // slotInfo: {
 
-//       slotBookingId: {
+    //   slotBookingId: {
 
-//         type: Schema.Types.ObjectId,
+    //     type: Schema.Types.ObjectId,
 
-//         ref: "SlotBooking"
+    //     ref: "SlotBooking"
 
-//       },
+    //   },
 
-//       slotId: Schema.Types.ObjectId,
+    //   slotId: Schema.Types.ObjectId,
 
-//       isSlotBooked: { type: Boolean, default: false },
+    //   isSlotBooked: { type: Boolean, default: false },
 
-//       isPeakSlot: Boolean,
+    //   isPeakSlot: Boolean,
 
-//       slotStartAt: Date,
+    //   slotStartAt: Date,
 
-//       slotEndAt: Date
+    //   slotEndAt: Date
 
-//     },
- 
+    // }
 //     // 🔹 Assigned rider snapshot
 
 //     assignedRider: {
@@ -418,6 +417,27 @@ const OrderSchema = new Schema(
       tips: { type: Number, default: 0 },
       totalEarning: { type: Number, default: 0 },
       credited: { type: Boolean, default: false }
+    },
+    slotInfo: {
+
+      slotBookingId: {
+
+        type: Schema.Types.ObjectId,
+
+        ref: "SlotBooking"
+
+      },
+
+      slotId: Schema.Types.ObjectId,
+
+      isSlotBooked: { type: Boolean, default: false },
+
+      isPeakSlot: Boolean,
+
+      slotStartAt: Date,
+
+      slotEndAt: Date
+
     },
  
     // Order Status

@@ -13,7 +13,9 @@ const {
     cancelOrder,
     getOrdersByRider,
     getDeliveredOrdersByRider,
-    getCancelledOrdersByRider
+    getCancelledOrdersByRider,
+    isRiderBookedNow,
+    getAvailableRiders
 } = require("../controllers/orderController");
 
 const { riderAuthMiddleWare } = require("../middleware/riderAuthMiddleware");
@@ -979,6 +981,12 @@ router.get("/:riderId/delivered",riderAuthMiddleWare,getDeliveredOrdersByRider);
 router.get("/cancelled",riderAuthMiddleWare,getCancelledOrdersByRider);
 
 
+
+router.get("/rider/current-slot-status", riderAuthMiddleWare, isRiderBookedNow);
+
+
+
+router.get("/available-riders",getAvailableRiders);
 
 
 
